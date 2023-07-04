@@ -2,16 +2,26 @@
 #![no_main]
 #![no_std]
 
-#[no_mangle]
-pub extern "C" fn main() {
-    loop {}
+use panic_halt as _;
+
+#[arduino_hal::entry]
+fn main() -> ! {
+    let dp = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(dp);
+    let mut led = pins.led_rx.into_output();
+
+    led.set_low();
+
+    loop {
+        led.toggle();
+        arduino_hal::delay_ms(1000);
+    }
 }
 
 #[lang = "eh_personality"]
 #[no_mangle]
 pub unsafe extern "C" fn rust_eh_personality() {}
 
-#[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
+// TODO: why is this here? why is it not provided by anything else?
+#[no_mangle]
+pub unsafe extern "C" fn abort() -> ! { loop {} }
