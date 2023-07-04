@@ -4,6 +4,21 @@
 #![no_main]
 #![no_std]
 
+// TODO: see if we can make this appear as an XInput controller
+// so we can use button input directly instead of mapping onto characters
+
+// TODO: make InputReader only fill up the parts of a KeyboardReport that it uses
+// instead of always filling up each KeyboardReport with `0`s.
+
+// TODO: maybe change how the InputReader works so that it only buffers the last 6 inputs instead of repeating inputs.
+// maybe here = depending on testing to determine how this works in practice
+
+// TODO: the separation between pins (in main.rs) and input (in inputs.rs) is confusing.
+// it would be nice to group them together.
+
+// TODO: for some reason pulling pin D3 down causes both `S` and `A`
+// to activate when it should only be `S`
+
 use arduino_hal::pac::USART1;
 use arduino_hal::port::mode::Input;
 use arduino_hal::port::mode::Output;
