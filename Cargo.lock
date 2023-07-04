@@ -26,6 +26,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atmega-usbd"
+version = "0.1.0"
+source = "git+https://github.com/agausmann/atmega-usbd?rev=64657638f2356122160a61b6c04374b3b63ad496#64657638f2356122160a61b6c04374b3b63ad496"
+dependencies = [
+ "avr-device",
+ "usb-device",
+]
+
+[[package]]
 name = "avr-device"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -121,7 +130,10 @@ name = "fightstick"
 version = "0.1.0"
 dependencies = [
  "arduino-hal",
+ "atmega-usbd",
+ "avr-device",
  "panic-halt",
+ "usb-device",
  "usbd-hid",
 ]
 

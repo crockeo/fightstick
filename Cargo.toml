@@ -11,8 +11,14 @@ lto = true
 [dependencies]
 panic-halt = "0.2.0"
 usbd-hid = "0.6.1"
+usb-device = "0.2.9"
+avr-device = "0.5.1"
 
 [dependencies.arduino-hal]
 git = "https://github.com/rahix/avr-hal"
 rev = "3c02df9df80e7585765644a87076680a2d99b29a"
 features = ["sparkfun-promicro"]
+
+[dependencies.atmega-usbd]
+git = "https://github.com/agausmann/atmega-usbd"
+rev = "64657638f2356122160a61b6c04374b3b63ad496"
