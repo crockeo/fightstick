@@ -22,6 +22,8 @@ use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 use usbd_hid::hid_class::HIDClass;
 
+mod libc;
+
 const PAYLOAD: &[u8] = b"Hello World";
 static mut USB_CTX: Option<UsbContext> = None;
 
@@ -168,22 +170,4 @@ pub unsafe extern "C" fn rust_eh_personality() {}
 #[no_mangle]
 pub unsafe extern "C" fn abort() -> ! {
     loop {}
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn memcpy(dst: *mut u8, src: *const u8, n: c_size_t) {
-    unsafe {
-        for i in 0..n {
-            *dst.add(i) = *src.add(i);
-        }
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn memset(dst: *mut u8, c: c_int, n: c_size_t) {
-    unsafe {
-        for i in 0..n {
-            *dst.add(i) = c as u8;
-        }
-    }
 }
