@@ -8,3 +8,11 @@ deploy: build
 .PHONY: build
 build:
 	cargo +nightly-2022-07-17-aarch64-apple-darwin build --release
+
+
+.PHONY: doc
+doc:
+	cargo +nightly-2022-07-17-aarch64-apple-darwin doc --open --release
+
+.PHONY:
+listen:

@@ -4,13 +4,13 @@
 #![no_main]
 #![no_std]
 
-use core::ffi::c_int;
-use core::ffi::c_size_t;
-
+use arduino_hal::pac::USART1;
 use arduino_hal::port::mode::Input;
 use arduino_hal::port::mode::Output;
-use arduino_hal::port::mode::PullUp;
 use arduino_hal::port::Pin;
+use arduino_hal::usart::Usart;
+use atmega_hal::port::PD2;
+use atmega_hal::port::PD3;
 use atmega_usbd::UsbBus;
 use avr_device::interrupt;
 use panic_halt as _;
@@ -22,6 +22,7 @@ use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 use usbd_hid::hid_class::HIDClass;
 
+mod inputs;
 mod libc;
 
 const PAYLOAD: &[u8] = b"Hello World";
@@ -32,8 +33,11 @@ fn main() -> ! {
     let peripherals = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(peripherals);
 
-    let status = pins.led_tx.into_output();
-    let trigger = pins.d2.into_pull_up_input();
+    let mut indicator = pins.led_tx.into_output();
+    indicator.set_high();
+    pins.led_rx.into_output().set_high();
+
+    let serial = arduino_hal::default_serial!(peripherals, pins, 115200);
 
     // Magical incantation which does some nonsense to something called PLL.
     // TODO: figure out what this is.
@@ -56,11 +60,34 @@ fn main() -> ! {
 
     unsafe {
         USB_CTX = Some(UsbContext {
-            hid_class: hid_class,
-            usb_device: usb_device,
-            current_index: 0,
-            indicator: status.downgrade(),
-            trigger: trigger.downgrade(),
+            hid_class,
+            usb_device,
+            serial,
+            indicator: indicator.downgrade(),
+            input_reader: inputs::InputReader::new([
+                // start / select
+                pins.a2.into_pull_up_input().downgrade(),
+                pins.a3.into_pull_up_input().downgrade(),
+                // up / down / left / right
+                pins.d2.into_pull_up_input().downgrade(),
+                pins.d3.into_pull_up_input().downgrade(),
+                pins.d4.into_pull_up_input().downgrade(),
+                pins.d5.into_pull_up_input().downgrade(),
+                // a / b / x / y
+                pins.d6.into_pull_up_input().downgrade(),
+                pins.d7.into_pull_up_input().downgrade(),
+                pins.d8.into_pull_up_input().downgrade(),
+                pins.d9.into_pull_up_input().downgrade(),
+                // r1 / r2 / r3
+                pins.d10.into_pull_up_input().downgrade(),
+                pins.d16.into_pull_up_input().downgrade(),
+                pins.d14.into_pull_up_input().downgrade(),
+                // l1 / l2 / l3
+                pins.d15.into_pull_up_input().downgrade(),
+                pins.a0.into_pull_up_input().downgrade(),
+                pins.a1.into_pull_up_input().downgrade(),
+            ]),
+            report_queue: ReportQueue::new(),
         });
     }
 
@@ -95,71 +122,63 @@ unsafe fn poll_usb() {
 struct UsbContext {
     usb_device: UsbDevice<'static, UsbBus>,
     hid_class: HIDClass<'static, UsbBus>,
-    current_index: usize,
+    serial: Usart<USART1, Pin<Input, PD2>, Pin<Output, PD3>>,
     indicator: Pin<Output>,
-    trigger: Pin<Input<PullUp>>,
+    input_reader: inputs::InputReader,
+    report_queue: ReportQueue,
 }
 
 impl UsbContext {
     fn poll(&mut self) {
-        if self.trigger.is_low() {
+        if self.report_queue.empty() {
             self.indicator.set_high();
-
-            if let Some(report) = PAYLOAD
-                .get(self.current_index)
-                .copied()
-                .and_then(ascii_to_report)
-            {
-                if self.hid_class.push_input(&report).is_ok() {
-                    self.current_index += 1;
-                }
-            } else {
-                self.hid_class.push_input(&BLANK_REPORT).ok();
-            }
-        } else {
-            self.indicator.set_low();
-
-            self.current_index = 0;
-            self.hid_class.push_input(&BLANK_REPORT).ok();
+            let input_map = self.input_reader.read();
+            let (reports, num_populated) = input_map.into_keyboard_reports();
+            self.report_queue.replace(reports, num_populated);
         }
 
-        if self.usb_device.poll(&mut [&mut self.hid_class]) {
-            let mut report_buf = [0u8; 1];
-
-            if self.hid_class.pull_raw_output(&mut report_buf).is_ok() {
-                if report_buf[0] & 2 != 0 {
-                    self.indicator.set_high();
-                } else {
-                    self.indicator.set_low();
-                }
-            }
+        if let Some(report) = self.report_queue.pop() {
+            self.indicator.set_low();
+            _ = self.hid_class.push_input(&report);
         }
     }
 }
 
-const BLANK_REPORT: KeyboardReport = KeyboardReport {
-    modifier: 0,
-    reserved: 0,
-    leds: 0,
-    keycodes: [0; 6],
-};
+const QUEUE_SIZE: usize = 3;
 
-fn ascii_to_report(c: u8) -> Option<KeyboardReport> {
-    let (keycode, shift) = if c.is_ascii_alphabetic() {
-        (c.to_ascii_lowercase() - b'a' + 0x04, c.is_ascii_uppercase())
-    } else {
-        match c {
-            b' ' => (0x2c, false),
-            _ => return None,
+struct ReportQueue {
+    queue: [KeyboardReport; QUEUE_SIZE],
+    head: usize,
+}
+
+impl ReportQueue {
+    fn new() -> Self {
+        Self {
+            queue: [inputs::EMPTY_REPORT; QUEUE_SIZE],
+            head: QUEUE_SIZE,
         }
-    };
-
-    let mut report = BLANK_REPORT;
-    if shift {
-        report.modifier |= 0x2;
     }
-    report.keycodes[0] = keycode;
-    Some(report)
+
+    fn replace(&mut self, reports: [KeyboardReport; QUEUE_SIZE], num_populated: usize) {
+        let diff = QUEUE_SIZE - num_populated;
+        for i in 0..num_populated {
+            self.queue[i + diff] = reports[i];
+        }
+        self.head = diff;
+    }
+
+    fn pop(&mut self) -> Option<KeyboardReport> {
+        if self.empty() {
+            return None;
+        }
+        let report = self.queue[self.head];
+        self.head += 1;
+        Some(report)
+    }
+
+    fn empty(&self) -> bool {
+        self.head >= self.queue.len()
+    }
 }
 
 #[lang = "eh_personality"]
