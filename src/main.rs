@@ -25,7 +25,6 @@ use usbd_hid::hid_class::HIDClass;
 mod inputs;
 mod libc;
 
-const PAYLOAD: &[u8] = b"Hello World";
 static mut USB_CTX: Option<UsbContext> = None;
 
 #[arduino_hal::entry]
