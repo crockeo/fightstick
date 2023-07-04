@@ -7,4 +7,4 @@ deploy: build
 
 .PHONY: build
 build:
-	cargo build --release
+	cargo +nightly-2022-07-17-aarch64-apple-darwin build --release

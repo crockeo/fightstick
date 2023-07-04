@@ -13,7 +13,7 @@
   },
   "linker": "avr-gcc",
   "llvm-target": "avr-unknown-unknown",
-  "max-atomic-width": 0,
+  "max-atomic-width": 16,
   "pre-link-args": {
     "gcc": [
       "-mmcu=atmega32u4"
