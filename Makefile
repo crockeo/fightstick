@@ -7,12 +7,13 @@ deploy: build
 
 .PHONY: build
 build:
-	cargo +nightly-2022-07-17-aarch64-apple-darwin build --release
+	cargo build -Zbuild-std=core --target=./atmega32u4.json --release
+
+.PHONY: test
+test:
+	cargo test --release
 
 
 .PHONY: doc
 doc:
-	cargo +nightly-2022-07-17-aarch64-apple-darwin doc --open --release
-
-.PHONY:
-listen:
+	cargo doc --open --release

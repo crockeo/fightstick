@@ -1,8 +1,8 @@
 #![feature(abi_avr_interrupt)]
 #![feature(c_size_t)]
 #![feature(lang_items)]
-#![no_main]
-#![no_std]
+#![cfg_attr(not(test), no_main)]
+#![cfg_attr(not(test), no_std)]
 
 // TODO: see if we can make this appear as an XInput controller
 // so we can use button input directly instead of mapping onto characters
@@ -28,7 +28,6 @@ use atmega_hal::port::PD2;
 use atmega_hal::port::PD3;
 use atmega_usbd::UsbBus;
 use avr_device::interrupt;
-use panic_halt as _;
 use usb_device::bus::UsbBusAllocator;
 use usb_device::device::UsbDevice;
 use usb_device::device::UsbDeviceBuilder;
@@ -40,8 +39,15 @@ use usbd_hid::hid_class::HIDClass;
 mod inputs;
 mod libc;
 
+#[cfg(not(test))]
+use panic_halt as _;
+
 static mut USB_CTX: Option<UsbContext> = None;
 
+#[cfg(test)]
+fn main() {}
+
+#[cfg(not(test))]
 #[arduino_hal::entry]
 fn main() -> ! {
     let peripherals = arduino_hal::Peripherals::take().unwrap();
@@ -114,6 +120,7 @@ fn main() -> ! {
     }
 }
 
+#[cfg(not(test))]
 #[interrupt(atmega32u4)]
 fn USB_GEN() {
     unsafe {
@@ -121,6 +128,7 @@ fn USB_GEN() {
     }
 }
 
+#[cfg(not(test))]
 #[interrupt(atmega32u4)]
 fn USB_COM() {
     unsafe {
@@ -208,6 +216,7 @@ impl ReportQueue {
     }
 }
 
+#[cfg(not(test))]
 #[lang = "eh_personality"]
 #[no_mangle]
 pub unsafe extern "C" fn rust_eh_personality() {}
