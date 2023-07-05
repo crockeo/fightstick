@@ -141,6 +141,25 @@ unsafe fn poll_usb() {
     ctx.poll();
 }
 
+const SCANCODES: [u8; inputs::INPUT_MAP_WIDTH] = [
+    0x29,          // start -> escape
+    0x35,          // select -> `
+    scancode('w'), // up -> w
+    scancode('s'), // down -> s
+    scancode('a'), // left -> a
+    scancode('d'), // right -> d
+    scancode('j'), // a -> j
+    scancode('k'), // b -> k
+    scancode('u'), // x -> u
+    scancode('i'), // y -> i
+    scancode('o'), // r1 -> o
+    scancode('l'), // r2 -> l
+    0x1e,          // r3 -> 1
+    scancode('p'), // l1 -> p
+    0x33,          // l2 -> ;
+    0x1f,          // l3 -> 2
+];
+
 struct UsbContext {
     usb_device: UsbDevice<'static, UsbBus>,
     hid_class: HIDClass<'static, UsbBus>,
@@ -155,16 +174,16 @@ impl UsbContext {
         if self.report_queue.empty() {
             self.indicator.set_high();
             let input_map = self.input_reader.read();
-            let (reports, num_populated) = input_map.into_keyboard_reports();
+            let (reports, num_populated) = input_map.into_keyboard_reports(SCANCODES);
             self.report_queue.replace(reports, num_populated);
         }
 
         if let Some(report) = self.report_queue.pop() {
             self.indicator.set_low();
-	    _ = self.hid_class.push_input(&report);
+            let _ = self.hid_class.push_input(&report);
         } else {
-	    _ = self.hid_class.push_input(&inputs::EMPTY_REPORT);
-	}
+            let _ = self.hid_class.push_input(&inputs::EMPTY_REPORT);
+        }
 
         if self.usb_device.poll(&mut [&mut self.hid_class]) {
             let mut report_buf = [0u8; 1];
@@ -177,6 +196,10 @@ impl UsbContext {
             }
         }
     }
+}
+
+fn scancode(c: char) -> u8 {
+    (c as u8 - b'a') + 0x04
 }
 
 const QUEUE_SIZE: usize = 3;
