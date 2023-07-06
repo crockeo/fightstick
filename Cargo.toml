@@ -14,6 +14,7 @@ usbd-hid = "0.6.1"
 usb-device = "0.2.9"
 avr-device = "0.5.1"
 ufmt = "0.2.0"
+bitmask-enum = "2.2.0"
 
 [dependencies.arduino-hal]
 git = "https://github.com/rahix/avr-hal"

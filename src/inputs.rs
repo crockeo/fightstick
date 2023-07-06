@@ -1,16 +1,85 @@
+use core::slice::Iter;
+
 use arduino_hal::port::mode::Input;
 use arduino_hal::port::mode::PullUp;
 use arduino_hal::port::Pin;
+use bitmask_enum::bitmask;
 use usbd_hid::descriptor::KeyboardReport;
 
 pub const INPUT_MAP_WIDTH: usize = 16;
 
+#[bitmask(u16)]
+pub enum Button {
+    Start,
+    Select,
+    Up,
+    Down,
+    Left,
+    Right,
+    LightPunch,
+    MediumPunch,
+    HeavyPunch,
+    LightKick,
+    MediumKick,
+    HeavyKick,
+    Macro1,
+    Macro2,
+    Macro3,
+    Macro4,
+}
+
+impl Button {
+    fn iterator() -> Iter<'static, Button> {
+	static BUTTONS: [Button; INPUT_MAP_WIDTH] = [
+            Button::Start,
+            Button::Select,
+            Button::Up,
+            Button::Down,
+            Button::Left,
+            Button::Right,
+            Button::LightPunch,
+            Button::MediumPunch,
+            Button::HeavyPunch,
+            Button::LightKick,
+            Button::MediumKick,
+            Button::HeavyKick,
+            Button::Macro1,
+            Button::Macro2,
+            Button::Macro3,
+            Button::Macro4,
+        ];
+	BUTTONS.iter()
+    }
+
+    const fn keyboard_scancode(self) -> u8 {
+        match self {
+            Button::Start => 0x29,                              // start -> escape
+            Button::Select => 0x35,                             // select -> `
+            Button::Up => keyboard_char_scancode('w'),          // up -> w
+            Button::Down => keyboard_char_scancode('s'),        // down -> s
+            Button::Left => keyboard_char_scancode('a'),        // left -> a
+            Button::Right => keyboard_char_scancode('d'),       // right -> d
+            Button::LightPunch => keyboard_char_scancode('u'),  // x -> u
+            Button::MediumPunch => keyboard_char_scancode('i'), // y -> i
+            Button::HeavyPunch => keyboard_char_scancode('o'),  // r1 -> o
+            Button::LightKick => keyboard_char_scancode('j'),   // a -> j
+            Button::MediumKick => keyboard_char_scancode('k'),  // b -> k
+            Button::HeavyKick => keyboard_char_scancode('l'),   // r2 -> l
+            Button::Macro1 => keyboard_char_scancode('p'),      // l1 -> p
+            Button::Macro2 => 0x33,                             // l2 -> ;
+            Button::Macro3 => 0x1e,                             // r3 -> 1
+            Button::Macro4 => 0x1f,                             // l3 -> 2
+	    _ => panic!("Invalid button"),
+        }
+    }
+}
+
 pub struct InputReader {
-    pins: [Pin<Input<PullUp>>; INPUT_MAP_WIDTH],
+    pins: [(Pin<Input<PullUp>>, Button); INPUT_MAP_WIDTH],
 }
 
 impl InputReader {
-    pub fn new(pins: [Pin<Input<PullUp>>; INPUT_MAP_WIDTH]) -> Self {
+    pub fn new(pins: [(Pin<Input<PullUp>>, Button); INPUT_MAP_WIDTH]) -> Self {
         // TODO: maybe make these map onto real, specific pins
         // so we don't have the runtime overhead?
         Self { pins }
@@ -18,7 +87,12 @@ impl InputReader {
 
     pub fn read(&self) -> InputMap {
         let mut bitmap: u16 = 0;
-        for (i, pin) in self.pins.iter().enumerate() {
+        for (pin, button) in self.pins.iter() {
+            if pin.is_low() {
+                bitmap |= button.bits();
+            }
+        }
+        for (i, (pin, button)) in self.pins.iter().enumerate() {
             if pin.is_low() {
                 bitmap |= 1 << i;
             }
@@ -30,17 +104,14 @@ impl InputReader {
 pub struct InputMap(u16);
 
 impl InputMap {
-    pub fn into_keyboard_reports(
-        self,
-        scancodes: [u8; INPUT_MAP_WIDTH],
-    ) -> ([KeyboardReport; 3], usize) {
+    pub fn into_keyboard_reports(self) -> ([KeyboardReport; 3], usize) {
         let mut reports = [EMPTY_REPORT; 3];
         let mut report_index = 0;
-        for (i, scancode) in scancodes.into_iter().enumerate() {
+        for button in Button::iterator() {
             let report = &mut reports[report_index / 6];
-            let pressed = self.0 & (1 << i) != 0;
+            let pressed = self.0 & button.bits() != 0;
             if pressed {
-                report.keycodes[report_index % 6] = scancode;
+                report.keycodes[report_index % 6] = button.keyboard_scancode();
                 report_index += 1;
             }
         }
@@ -51,6 +122,10 @@ impl InputMap {
         }
         (reports, len)
     }
+}
+
+const fn keyboard_char_scancode(c: char) -> u8 {
+    (c as u8 - b'a') + 0x04
 }
 
 pub const EMPTY_REPORT: KeyboardReport = KeyboardReport {

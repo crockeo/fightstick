@@ -85,27 +85,22 @@ fn main() -> ! {
             serial,
             indicator: indicator.downgrade(),
             input_reader: inputs::InputReader::new([
-                // start / select
-                pins.a2.into_pull_up_input().downgrade(),
-                pins.a3.into_pull_up_input().downgrade(),
-                // up / down / left / right
-                pins.d2.into_pull_up_input().downgrade(),
-                pins.d3.into_pull_up_input().downgrade(),
-                pins.d4.into_pull_up_input().downgrade(),
-                pins.d5.into_pull_up_input().downgrade(),
-                // a / b / x / y
-                pins.d6.into_pull_up_input().downgrade(),
-                pins.d7.into_pull_up_input().downgrade(),
-                pins.d8.into_pull_up_input().downgrade(),
-                pins.d9.into_pull_up_input().downgrade(),
-                // r1 / r2 / r3
-                pins.d10.into_pull_up_input().downgrade(),
-                pins.d16.into_pull_up_input().downgrade(),
-                pins.d14.into_pull_up_input().downgrade(),
-                // l1 / l2 / l3
-                pins.d15.into_pull_up_input().downgrade(),
-                pins.a0.into_pull_up_input().downgrade(),
-                pins.a1.into_pull_up_input().downgrade(),
+                (pins.a2.into_pull_up_input().downgrade(), inputs::Button::Start),
+                (pins.a3.into_pull_up_input().downgrade(), inputs::Button::Select),
+                (pins.d2.into_pull_up_input().downgrade(), inputs::Button::Up),
+                (pins.d3.into_pull_up_input().downgrade(), inputs::Button::Down),
+                (pins.d4.into_pull_up_input().downgrade(), inputs::Button::Left),
+                (pins.d5.into_pull_up_input().downgrade(), inputs::Button::Right),
+                (pins.d8.into_pull_up_input().downgrade(), inputs::Button::LightPunch),
+                (pins.d9.into_pull_up_input().downgrade(), inputs::Button::MediumPunch),
+                (pins.d10.into_pull_up_input().downgrade(), inputs::Button::HeavyPunch),
+                (pins.d6.into_pull_up_input().downgrade(), inputs::Button::LightKick),
+                (pins.d7.into_pull_up_input().downgrade(), inputs::Button::MediumKick),
+                (pins.d16.into_pull_up_input().downgrade(), inputs::Button::HeavyKick),
+                (pins.d15.into_pull_up_input().downgrade(), inputs::Button::Macro1),
+                (pins.a0.into_pull_up_input().downgrade(), inputs::Button::Macro2),
+                (pins.d14.into_pull_up_input().downgrade(), inputs::Button::Macro3),
+                (pins.a1.into_pull_up_input().downgrade(), inputs::Button::Macro4),
             ]),
             report_queue: ReportQueue::new(),
         });
@@ -141,25 +136,6 @@ unsafe fn poll_usb() {
     ctx.poll();
 }
 
-const SCANCODES: [u8; inputs::INPUT_MAP_WIDTH] = [
-    0x29,          // start -> escape
-    0x35,          // select -> `
-    scancode('w'), // up -> w
-    scancode('s'), // down -> s
-    scancode('a'), // left -> a
-    scancode('d'), // right -> d
-    scancode('j'), // a -> j
-    scancode('k'), // b -> k
-    scancode('u'), // x -> u
-    scancode('i'), // y -> i
-    scancode('o'), // r1 -> o
-    scancode('l'), // r2 -> l
-    0x1e,          // r3 -> 1
-    scancode('p'), // l1 -> p
-    0x33,          // l2 -> ;
-    0x1f,          // l3 -> 2
-];
-
 struct UsbContext {
     usb_device: UsbDevice<'static, UsbBus>,
     hid_class: HIDClass<'static, UsbBus>,
@@ -174,7 +150,7 @@ impl UsbContext {
         if self.report_queue.empty() {
             self.indicator.set_high();
             let input_map = self.input_reader.read();
-            let (reports, num_populated) = input_map.into_keyboard_reports(SCANCODES);
+            let (reports, num_populated) = input_map.into_keyboard_reports();
             self.report_queue.replace(reports, num_populated);
         }
 
@@ -196,10 +172,6 @@ impl UsbContext {
             }
         }
     }
-}
-
-fn scancode(c: char) -> u8 {
-    (c as u8 - b'a') + 0x04
 }
 
 const QUEUE_SIZE: usize = 3;
