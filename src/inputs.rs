@@ -10,22 +10,22 @@ pub const INPUT_MAP_WIDTH: usize = 16;
 #[derive(Copy, Clone)]
 #[repr(u16)]
 pub enum Button {
-    Start       = 0b0000_0000_0000_0001,
-    Select      = 0b0000_0000_0000_0010,
-    Up          = 0b0000_0000_0000_0100,
-    Down        = 0b0000_0000_0000_1000,
-    Left        = 0b0000_0000_0001_0000,
-    Right       = 0b0000_0000_0010_0000,
-    LightPunch  = 0b0000_0000_0100_0000,
+    Start = 0b0000_0000_0000_0001,
+    Select = 0b0000_0000_0000_0010,
+    Up = 0b0000_0000_0000_0100,
+    Down = 0b0000_0000_0000_1000,
+    Left = 0b0000_0000_0001_0000,
+    Right = 0b0000_0000_0010_0000,
+    LightPunch = 0b0000_0000_0100_0000,
     MediumPunch = 0b0000_0000_1000_0000,
-    HeavyPunch  = 0b0000_0001_0000_0000,
-    LightKick   = 0b0000_0010_0000_0000,
-    MediumKick  = 0b0000_0100_0000_0000,
-    HeavyKick   = 0b0000_1000_0000_0000,
-    Macro1      = 0b0001_0000_0000_0000,
-    Macro2      = 0b0010_0000_0000_0000,
-    Macro3      = 0b0100_0000_0000_0000,
-    Macro4      = 0b1000_0000_0000_0000,
+    HeavyPunch = 0b0000_0001_0000_0000,
+    LightKick = 0b0000_0010_0000_0000,
+    MediumKick = 0b0000_0100_0000_0000,
+    HeavyKick = 0b0000_1000_0000_0000,
+    Macro1 = 0b0001_0000_0000_0000,
+    Macro2 = 0b0010_0000_0000_0000,
+    Macro3 = 0b0100_0000_0000_0000,
+    Macro4 = 0b1000_0000_0000_0000,
 }
 
 impl Button {
@@ -132,33 +132,66 @@ pub const EMPTY_REPORT: KeyboardReport = KeyboardReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const KEYCODES: [u8; INPUT_MAP_WIDTH] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    use Button::*;
 
     #[test]
     fn test_into_keyboard_reports_empty() {
-        let (_, count) = InputMap(0).into_keyboard_reports(KEYCODES);
+        let (_, count) = InputMap(0).into_keyboard_reports();
         assert_eq!(count, 0);
     }
 
     #[test]
     fn test_into_keyboard_reports_single() {
-        let (reports, count) = InputMap(0b1).into_keyboard_reports(KEYCODES);
+        let (reports, count) = InputMap(Button::Start as u16).into_keyboard_reports();
         assert_eq!(count, 1);
-        assert_eq!(reports[0].keycodes[0], 1);
+        assert_eq!(reports[0].keycodes[0], Button::Start.keyboard_scancode());
     }
 
     #[test]
     fn test_into_keyboard_reports_many() {
-        let (reports, count) = InputMap(0b0011_1111).into_keyboard_reports(KEYCODES);
+        let (reports, count) = InputMap(
+            Start as u16 | Select as u16 | Up as u16 | Down as u16 | Left as u16 | Right as u16,
+        )
+        .into_keyboard_reports();
         assert_eq!(count, 1);
-        assert_eq!(reports[0].keycodes, [1, 2, 3, 4, 5, 6]);
+        assert_eq!(
+            reports[0].keycodes,
+            [
+                Start.keyboard_scancode(),
+                Select.keyboard_scancode(),
+                Up.keyboard_scancode(),
+                Down.keyboard_scancode(),
+                Left.keyboard_scancode(),
+                Right.keyboard_scancode(),
+            ]
+        );
     }
 
     #[test]
     fn test_into_keyboard_reports_multipart() {
-        let (reports, count) = InputMap(0b0011_1111).into_keyboard_reports(KEYCODES);
-        assert_eq!(count, 1);
-        assert_eq!(reports[0].keycodes, [1, 2, 3, 4, 5, 6]);
+        let (reports, count) = InputMap(0b1111_1111).into_keyboard_reports();
+        assert_eq!(count, 2);
+        assert_eq!(
+            reports[0].keycodes,
+            [
+                Start.keyboard_scancode(),
+                Select.keyboard_scancode(),
+                Up.keyboard_scancode(),
+                Down.keyboard_scancode(),
+                Left.keyboard_scancode(),
+                Right.keyboard_scancode(),
+            ]
+        );
+        assert_eq!(
+            reports[1].keycodes,
+            [
+                LightPunch.keyboard_scancode(),
+                MediumPunch.keyboard_scancode(),
+                0,
+                0,
+                0,
+                0,
+            ]
+        );
     }
 }
