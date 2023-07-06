@@ -3,34 +3,34 @@ use core::slice::Iter;
 use arduino_hal::port::mode::Input;
 use arduino_hal::port::mode::PullUp;
 use arduino_hal::port::Pin;
-use bitmask_enum::bitmask;
 use usbd_hid::descriptor::KeyboardReport;
 
 pub const INPUT_MAP_WIDTH: usize = 16;
 
-#[bitmask(u16)]
+#[derive(Copy, Clone)]
+#[repr(u16)]
 pub enum Button {
-    Start,
-    Select,
-    Up,
-    Down,
-    Left,
-    Right,
-    LightPunch,
-    MediumPunch,
-    HeavyPunch,
-    LightKick,
-    MediumKick,
-    HeavyKick,
-    Macro1,
-    Macro2,
-    Macro3,
-    Macro4,
+    Start       = 0b0000_0000_0000_0001,
+    Select      = 0b0000_0000_0000_0010,
+    Up          = 0b0000_0000_0000_0100,
+    Down        = 0b0000_0000_0000_1000,
+    Left        = 0b0000_0000_0001_0000,
+    Right       = 0b0000_0000_0010_0000,
+    LightPunch  = 0b0000_0000_0100_0000,
+    MediumPunch = 0b0000_0000_1000_0000,
+    HeavyPunch  = 0b0000_0001_0000_0000,
+    LightKick   = 0b0000_0010_0000_0000,
+    MediumKick  = 0b0000_0100_0000_0000,
+    HeavyKick   = 0b0000_1000_0000_0000,
+    Macro1      = 0b0001_0000_0000_0000,
+    Macro2      = 0b0010_0000_0000_0000,
+    Macro3      = 0b0100_0000_0000_0000,
+    Macro4      = 0b1000_0000_0000_0000,
 }
 
 impl Button {
     fn iterator() -> Iter<'static, Button> {
-	static BUTTONS: [Button; INPUT_MAP_WIDTH] = [
+        static BUTTONS: [Button; INPUT_MAP_WIDTH] = [
             Button::Start,
             Button::Select,
             Button::Up,
@@ -48,7 +48,7 @@ impl Button {
             Button::Macro3,
             Button::Macro4,
         ];
-	BUTTONS.iter()
+        BUTTONS.iter()
     }
 
     const fn keyboard_scancode(self) -> u8 {
@@ -69,7 +69,6 @@ impl Button {
             Button::Macro2 => 0x33,                             // l2 -> ;
             Button::Macro3 => 0x1e,                             // r3 -> 1
             Button::Macro4 => 0x1f,                             // l3 -> 2
-	    _ => panic!("Invalid button"),
         }
     }
 }
@@ -89,12 +88,7 @@ impl InputReader {
         let mut bitmap: u16 = 0;
         for (pin, button) in self.pins.iter() {
             if pin.is_low() {
-                bitmap |= button.bits();
-            }
-        }
-        for (i, (pin, button)) in self.pins.iter().enumerate() {
-            if pin.is_low() {
-                bitmap |= 1 << i;
+                bitmap |= *button as u16;
             }
         }
         InputMap(bitmap)
@@ -109,7 +103,7 @@ impl InputMap {
         let mut report_index = 0;
         for button in Button::iterator() {
             let report = &mut reports[report_index / 6];
-            let pressed = self.0 & button.bits() != 0;
+            let pressed = self.0 & *button as u16 != 0;
             if pressed {
                 report.keycodes[report_index % 6] = button.keyboard_scancode();
                 report_index += 1;
