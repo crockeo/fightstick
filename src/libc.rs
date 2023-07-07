@@ -17,3 +17,8 @@ pub unsafe extern "C" fn memset(dst: *mut u8, c: c_int, n: c_size_t) {
         *dst.add(i) = c as u8;
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn abort() -> ! {
+    loop {}
+}

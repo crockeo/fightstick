@@ -42,13 +42,35 @@ mod libc;
 #[cfg(not(test))]
 use panic_halt as _;
 
-static mut USB_CTX: Option<UsbContext> = None;
-
-#[cfg(test)]
-fn main() {}
-
 #[cfg(not(test))]
 #[arduino_hal::entry]
+fn avr_entry() -> ! {
+    main()
+}
+
+#[cfg(not(test))]
+#[lang = "eh_personality"]
+#[no_mangle]
+pub unsafe extern "C" fn rust_eh_personality() {}
+
+#[cfg(not(test))]
+#[interrupt(atmega32u4)]
+fn USB_GEN() {
+    unsafe {
+        poll_usb();
+    }
+}
+
+#[cfg(not(test))]
+#[interrupt(atmega32u4)]
+fn USB_COM() {
+    unsafe {
+        poll_usb();
+    }
+}
+
+static mut USB_CTX: Option<UsbContext> = None;
+
 fn main() -> ! {
     let peripherals = arduino_hal::Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(peripherals);
@@ -112,22 +134,6 @@ fn main() -> ! {
 
     loop {
         avr_device::asm::sleep();
-    }
-}
-
-#[cfg(not(test))]
-#[interrupt(atmega32u4)]
-fn USB_GEN() {
-    unsafe {
-        poll_usb();
-    }
-}
-
-#[cfg(not(test))]
-#[interrupt(atmega32u4)]
-fn USB_COM() {
-    unsafe {
-        poll_usb();
     }
 }
 
@@ -202,15 +208,4 @@ impl ReportQueue {
     fn empty(&self) -> bool {
         self.head >= self.queue.len()
     }
-}
-
-#[cfg(not(test))]
-#[lang = "eh_personality"]
-#[no_mangle]
-pub unsafe extern "C" fn rust_eh_personality() {}
-
-// TODO: why is this here? why is it not provided by anything else?
-#[no_mangle]
-pub unsafe extern "C" fn abort() -> ! {
-    loop {}
 }
