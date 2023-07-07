@@ -147,6 +147,10 @@ struct UsbContext {
 
 impl UsbContext {
     fn poll(&mut self) {
+	if !self.usb_device.poll(&mut [&mut self.hid_class]) {
+	    return;
+	}
+
         if self.report_queue.empty() {
             self.indicator.set_high();
             let input_map = self.input_reader.read();
@@ -159,17 +163,6 @@ impl UsbContext {
             let _ = self.hid_class.push_input(&report);
         } else {
             let _ = self.hid_class.push_input(&inputs::EMPTY_REPORT);
-        }
-
-        if self.usb_device.poll(&mut [&mut self.hid_class]) {
-            let mut report_buf = [0u8; 1];
-            if self.hid_class.pull_raw_output(&mut report_buf).is_ok() {
-                if report_buf[0] & 2 != 0 {
-                    self.indicator.set_high();
-                } else {
-                    self.indicator.set_low();
-                }
-            }
         }
     }
 }
