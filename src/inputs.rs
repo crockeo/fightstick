@@ -3,7 +3,32 @@ use core::slice::Iter;
 use arduino_hal::port::mode::Input;
 use arduino_hal::port::mode::PullUp;
 use arduino_hal::port::Pin;
+use usbd_hid::descriptor::gen_hid_descriptor;
+use usbd_hid::descriptor::generator_prelude::*;
 use usbd_hid::descriptor::KeyboardReport;
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum InputMode {
+    Controller,
+    Keyboard,
+}
+
+pub const INPUT_MODE: InputMode = InputMode::Controller;
+
+#[gen_hid_descriptor(
+    (collection = APPLICATION, usage_page = GENERIC_DESKTOP, usage = JOYSTICK) = {
+	(usage_page = BUTTON, usage_min = 1, usage_max = 8) = {
+	    #[packed_bits 8] #[item_settings data,variable,absolute] buttons0=input;
+	};
+	(usage_page = BUTTON, usage_min = 9, usage_max = 16) = {
+	    #[packed_bits 8] #[item_settings data,variable,absolute] buttons1=input;
+	};
+    }
+)]
+pub struct GenericControllerReport {
+    pub buttons0: u8,
+    pub buttons1: u8,
+}
 
 pub const INPUT_MAP_WIDTH: usize = 16;
 
@@ -53,22 +78,22 @@ impl Button {
 
     const fn keyboard_scancode(self) -> u8 {
         match self {
-            Button::Start => 0x29,                              // start -> escape
-            Button::Select => 0x35,                             // select -> `
-            Button::Up => keyboard_char_scancode('w'),          // up -> w
-            Button::Down => keyboard_char_scancode('s'),        // down -> s
-            Button::Left => keyboard_char_scancode('a'),        // left -> a
-            Button::Right => keyboard_char_scancode('d'),       // right -> d
-            Button::LightPunch => keyboard_char_scancode('u'),  // x -> u
-            Button::MediumPunch => keyboard_char_scancode('i'), // y -> i
-            Button::HeavyPunch => keyboard_char_scancode('o'),  // r1 -> o
-            Button::LightKick => keyboard_char_scancode('j'),   // a -> j
-            Button::MediumKick => keyboard_char_scancode('k'),  // b -> k
-            Button::HeavyKick => keyboard_char_scancode('l'),   // r2 -> l
-            Button::Macro1 => keyboard_char_scancode('p'),      // l1 -> p
-            Button::Macro2 => 0x33,                             // l2 -> ;
-            Button::Macro3 => 0x1e,                             // r3 -> 1
-            Button::Macro4 => 0x1f,                             // l3 -> 2
+            Button::Start => 0x29,  // escape
+            Button::Select => 0x35, // grave
+            Button::Up => keyboard_char_scancode('w'),
+            Button::Down => keyboard_char_scancode('s'),
+            Button::Left => keyboard_char_scancode('a'),
+            Button::Right => keyboard_char_scancode('d'),
+            Button::LightPunch => keyboard_char_scancode('u'),
+            Button::MediumPunch => keyboard_char_scancode('i'),
+            Button::HeavyPunch => keyboard_char_scancode('o'),
+            Button::LightKick => keyboard_char_scancode('j'),
+            Button::MediumKick => keyboard_char_scancode('k'),
+            Button::HeavyKick => keyboard_char_scancode('l'),
+            Button::Macro1 => keyboard_char_scancode('p'),
+            Button::Macro2 => 0x33, // ;
+            Button::Macro3 => 0x1e, // 1
+            Button::Macro4 => 0x1f, // 2
         }
     }
 }
@@ -98,6 +123,17 @@ impl InputReader {
 pub struct InputMap(u16);
 
 impl InputMap {
+    pub fn empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    pub fn into_controller_report(self) -> GenericControllerReport {
+        let buttons = self.0;
+        let buttons0 = ((buttons & 0b1111_1111_0000_0000) >> 8) as u8;
+        let buttons1 = (buttons & 0b0000_0000_1111_1111) as u8;
+        GenericControllerReport { buttons0, buttons1 }
+    }
+
     pub fn into_keyboard_reports(self) -> ([KeyboardReport; 3], usize) {
         let mut reports = [EMPTY_REPORT; 3];
         let mut report_index = 0;

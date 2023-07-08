@@ -19,6 +19,9 @@
 // TODO: for some reason pulling pin D3 down causes both `S` and `A`
 // to activate when it should only be `S`
 
+mod inputs;
+mod libc;
+
 use arduino_hal::pac::USART1;
 use arduino_hal::port::mode::Input;
 use arduino_hal::port::mode::Output;
@@ -36,8 +39,12 @@ use usbd_hid::descriptor::KeyboardReport;
 use usbd_hid::descriptor::SerializedDescriptor;
 use usbd_hid::hid_class::HIDClass;
 
-mod inputs;
-mod libc;
+use inputs::Button;
+use inputs::GenericControllerReport;
+use inputs::InputMode;
+use inputs::InputReader;
+use inputs::EMPTY_REPORT;
+use inputs::INPUT_MODE;
 
 #[cfg(not(test))]
 use panic_halt as _;
@@ -94,7 +101,11 @@ fn main() -> ! {
         static mut USB_BUS: Option<UsbBusAllocator<UsbBus>> = None;
         USB_BUS.insert(UsbBus::new(peripherals.USB_DEVICE))
     };
-    let hid_class = HIDClass::new(usb_bus, KeyboardReport::desc(), 60);
+
+    let hid_class = match INPUT_MODE {
+        InputMode::Controller => HIDClass::new(usb_bus, GenericControllerReport::desc(), 60),
+        InputMode::Keyboard => HIDClass::new(usb_bus, KeyboardReport::desc(), 60),
+    };
     let usb_device = UsbDeviceBuilder::new(usb_bus, UsbVidPid(0x1209, 0x0001))
         .manufacturer("Foo")
         .product("Bar")
@@ -106,23 +117,29 @@ fn main() -> ! {
             usb_device,
             serial,
             indicator: indicator.downgrade(),
-            input_reader: inputs::InputReader::new([
-                (pins.a2.into_pull_up_input().downgrade(), inputs::Button::Start),
-                (pins.a3.into_pull_up_input().downgrade(), inputs::Button::Select),
-                (pins.d2.into_pull_up_input().downgrade(), inputs::Button::Up),
-                (pins.d3.into_pull_up_input().downgrade(), inputs::Button::Down),
-                (pins.d4.into_pull_up_input().downgrade(), inputs::Button::Left),
-                (pins.d5.into_pull_up_input().downgrade(), inputs::Button::Right),
-                (pins.d8.into_pull_up_input().downgrade(), inputs::Button::LightPunch),
-                (pins.d9.into_pull_up_input().downgrade(), inputs::Button::MediumPunch),
-                (pins.d10.into_pull_up_input().downgrade(), inputs::Button::HeavyPunch),
-                (pins.d6.into_pull_up_input().downgrade(), inputs::Button::LightKick),
-                (pins.d7.into_pull_up_input().downgrade(), inputs::Button::MediumKick),
-                (pins.d16.into_pull_up_input().downgrade(), inputs::Button::HeavyKick),
-                (pins.d15.into_pull_up_input().downgrade(), inputs::Button::Macro1),
-                (pins.a0.into_pull_up_input().downgrade(), inputs::Button::Macro2),
-                (pins.d14.into_pull_up_input().downgrade(), inputs::Button::Macro3),
-                (pins.a1.into_pull_up_input().downgrade(), inputs::Button::Macro4),
+            input_reader: InputReader::new([
+                (pins.a2.into_pull_up_input().downgrade(), Button::Start),
+                (pins.a3.into_pull_up_input().downgrade(), Button::Select),
+                (pins.d2.into_pull_up_input().downgrade(), Button::Up),
+                (pins.d3.into_pull_up_input().downgrade(), Button::Down),
+                (pins.d4.into_pull_up_input().downgrade(), Button::Left),
+                (pins.d5.into_pull_up_input().downgrade(), Button::Right),
+                (pins.d8.into_pull_up_input().downgrade(), Button::LightPunch),
+                (
+                    pins.d9.into_pull_up_input().downgrade(),
+                    Button::MediumPunch,
+                ),
+                (
+                    pins.d10.into_pull_up_input().downgrade(),
+                    Button::HeavyPunch,
+                ),
+                (pins.d6.into_pull_up_input().downgrade(), Button::LightKick),
+                (pins.d7.into_pull_up_input().downgrade(), Button::MediumKick),
+                (pins.d16.into_pull_up_input().downgrade(), Button::HeavyKick),
+                (pins.d15.into_pull_up_input().downgrade(), Button::Macro1),
+                (pins.a0.into_pull_up_input().downgrade(), Button::Macro2),
+                (pins.d14.into_pull_up_input().downgrade(), Button::Macro3),
+                (pins.a1.into_pull_up_input().downgrade(), Button::Macro4),
             ]),
             report_queue: ReportQueue::new(),
         });
@@ -147,16 +164,36 @@ struct UsbContext {
     hid_class: HIDClass<'static, UsbBus>,
     serial: Usart<USART1, Pin<Input, PD2>, Pin<Output, PD3>>,
     indicator: Pin<Output>,
-    input_reader: inputs::InputReader,
+    input_reader: InputReader,
     report_queue: ReportQueue,
 }
 
 impl UsbContext {
     fn poll(&mut self) {
-	if !self.usb_device.poll(&mut [&mut self.hid_class]) {
-	    return;
-	}
+        if !self.usb_device.poll(&mut [&mut self.hid_class]) {
+            return;
+        }
 
+        match INPUT_MODE {
+            InputMode::Controller => self.poll_controller(),
+            InputMode::Keyboard => self.poll_keyboard(),
+        }
+
+    }
+
+    fn poll_controller(&mut self) {
+        let input = self.input_reader.read();
+        if input.empty() {
+            self.indicator.set_high();
+        } else {
+            self.indicator.set_low();
+        }
+
+        let report = input.into_controller_report();
+        let _ = self.hid_class.push_input(&report);
+    }
+
+    fn poll_keyboard(&mut self) {
         if self.report_queue.empty() {
             self.indicator.set_high();
             let input_map = self.input_reader.read();
@@ -168,7 +205,7 @@ impl UsbContext {
             self.indicator.set_low();
             let _ = self.hid_class.push_input(&report);
         } else {
-            let _ = self.hid_class.push_input(&inputs::EMPTY_REPORT);
+            let _ = self.hid_class.push_input(&EMPTY_REPORT);
         }
     }
 }
@@ -183,7 +220,7 @@ struct ReportQueue {
 impl ReportQueue {
     fn new() -> Self {
         Self {
-            queue: [inputs::EMPTY_REPORT; QUEUE_SIZE],
+            queue: [EMPTY_REPORT; QUEUE_SIZE],
             head: QUEUE_SIZE,
         }
     }
