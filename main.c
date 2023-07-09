@@ -4,7 +4,7 @@
 #include <string.h>
 #include <util/delay.h>
 
-#include "layout.h"
+#include "keys.h"
 #include "usb.h"
 
 void turn_on_leds() {
