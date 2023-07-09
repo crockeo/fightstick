@@ -400,17 +400,26 @@ int write_hid_descriptor(uint16_t request_length) {
     );
 }
 
+typedef struct {
+    uint8_t request_type;
+    uint8_t request;
+    uint16_t value;
+    uint16_t index;
+    uint16_t length;
+} USBRequest;
+
+USBRequest read_request() {
+    USBRequest request;
+    for (int i = 0; i < sizeof(USBRequest); i++) {
+	((uint8_t*)&request)[i] = UEDATX;
+    }
+    return request;
+}
+
 ISR(USB_COM_vect) {
   UENUM = 0;
   if (UEINTX & (1 << RXSTPI)) {
-    uint8_t bmRequestType = UEDATX;  // UEDATX is FIFO; see table in README
-    uint8_t bRequest = UEDATX;
-    uint16_t wValue = UEDATX;
-    wValue |= UEDATX << 8;
-    uint16_t wIndex = UEDATX;
-    wIndex |= UEDATX << 8;
-    uint16_t wLength = UEDATX;
-    wLength |= UEDATX << 8;
+      USBRequest request = read_request();
 
     DDRC = 0xFF;
 
@@ -418,19 +427,19 @@ ISR(USB_COM_vect) {
         (1 << RXSTPI) | (1 << RXOUTI) |
         (1 << TXINI));  // Handshake the Interrupts, do this after recording
                         // the packet because it also clears the endpoint banks
-    if (bRequest == GET_DESCRIPTOR) {
-	switch (wValue) {
+    if (request.request == GET_DESCRIPTOR) {
+	switch (request.value) {
 	case 0x100:
-	    write_device_descriptor(wLength);
+	    write_device_descriptor(request.length);
 	    break;
 	case 0x200:
-	    write_configuration_descriptor(wLength);
+	    write_configuration_descriptor(request.length);
 	    break;
 	case 0x2100:
-	    write_hid_report_descriptor(wLength);
+	    write_hid_report_descriptor(request.length);
 	    break;
 	case 0x2200:
-	    write_hid_descriptor(wLength);
+	    write_hid_descriptor(request.length);
 	    break;
 	default:
             // Enable the endpoint and stall, the
@@ -441,11 +450,11 @@ ISR(USB_COM_vect) {
 	return;
     }
 
-    if (bRequest == SET_CONFIGURATION &&
-        bmRequestType ==
+    if (request.request == SET_CONFIGURATION &&
+        request.request_type ==
 	0) {  // Refer to USB Spec 9.4.7 - This is the configuration request
                   // to place the device into address mode
-	usb_config_status = wValue;
+	usb_config_status = request.value;
 	UEINTX &= ~(1 << TXINI);
 	UENUM = KEYBOARD_ENDPOINT_NUM;
 	UECONX = 1;
@@ -456,17 +465,17 @@ ISR(USB_COM_vect) {
 	return;
     }
 
-    if (bRequest == SET_ADDRESS) {
+    if (request.request == SET_ADDRESS) {
 	UEINTX &= ~(1 << TXINI);
 	while (!(UEINTX & (1 << TXINI)))
 	    ;  // Wait until the banks are ready to be filled
 
-	UDADDR = wValue | (1 << ADDEN);  // Set the device address
+	UDADDR = request.value | (1 << ADDEN);  // Set the device address
 	return;
     }
 
-    if (bRequest == GET_CONFIGURATION &&
-        bmRequestType == 0x80) {  // GET_CONFIGURATION is the host trying to get
+    if (request.request == GET_CONFIGURATION &&
+        request.request_type == 0x80) {  // GET_CONFIGURATION is the host trying to get
                                   // the current config status of the device
 	while (!(UEINTX & (1 << TXINI)))
 	    ;  // Wait until the banks are ready to be filled
@@ -475,7 +484,7 @@ ISR(USB_COM_vect) {
 	return;
     }
 
-    if (bRequest == GET_STATUS) {
+    if (request.request == GET_STATUS) {
 	while (!(UEINTX & (1 << TXINI)))
 	    ;
 	UEDATX = 0;
@@ -484,14 +493,14 @@ ISR(USB_COM_vect) {
 	return;
     }
 
-    if (wIndex == 0) {  // Is this a request to the keyboard interface for HID
+    if (request.index == 0) {  // Is this a request to the keyboard interface for HID
                         // class-specific requests?
-	if (bmRequestType ==
+	if (request.request_type ==
 	    0xA1) {  // GET Requests - Refer to the table in HID Specification 7.2
 	    // - This byte specifies the data direction of the packet.
-	    // Unnecessary since bRequest is unique, but it makes the
+	    // Unnecessary since request.request is unique, but it makes the
 	    // code clearer
-	    if (bRequest == GET_REPORT) {  // Get the current HID report
+	    if (request.request == GET_REPORT) {  // Get the current HID report
 		while (!(UEINTX & (1 << TXINI)))
 		    ;  // Wait for the banks to be ready for transmission
 		UEDATX = keyboard_modifier;
@@ -505,7 +514,7 @@ ISR(USB_COM_vect) {
 		UEINTX &= ~(1 << TXINI);
 		return;
 	    }
-	    if (bRequest == GET_IDLE) {
+	    if (request.request == GET_IDLE) {
 		while (!(UEINTX & (1 << TXINI)))
 		    ;
 
@@ -514,7 +523,7 @@ ISR(USB_COM_vect) {
 		UEINTX &= ~(1 << TXINI);
 		return;
 	    }
-	    if (bRequest == GET_PROTOCOL) {
+	    if (request.request == GET_PROTOCOL) {
 		while (!(UEINTX & (1 << TXINI)))
 		    ;
 
@@ -525,9 +534,9 @@ ISR(USB_COM_vect) {
 	    }
 	}
 
-	if (bmRequestType ==
+	if (request.request_type ==
 	    0x21) {  // SET Requests - Host-to-device data direction
-	    if (bRequest == SET_REPORT) {
+	    if (request.request == SET_REPORT) {
 		while (!(UEINTX & (1 << RXOUTI)))
 		    ;  // This is the opposite of the TXINI one, we are waiting until
 		// the banks are ready for reading instead of for writing
@@ -537,18 +546,18 @@ ISR(USB_COM_vect) {
 		UEINTX &= ~(1 << RXOUTI);
 		return;
 	    }
-	    if (bRequest == SET_IDLE) {
-		keyboard_idle_value = wValue;  //
+	    if (request.request == SET_IDLE) {
+		keyboard_idle_value = request.value;  //
 		current_idle = 0;
 
 		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
 		return;
 	    }
-	    if (bRequest ==
+	    if (request.request ==
 		SET_PROTOCOL) {  // This request is only mandatory for boot devices,
 		// and this is a boot device
 		keyboard_protocol =
-		    wValue >> 8;  // Nobody cares what happens to this, arbitrary cast
+		    request.value >> 8;  // Nobody cares what happens to this, arbitrary cast
 		// from 16 bit to 8 bit doesn't matter
 
 		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
