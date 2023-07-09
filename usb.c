@@ -471,6 +471,61 @@ int handle_get_status_request(USBRequest* request) {
     return 0;
 }
 
+int handle_get_report_request(USBRequest* request) {
+    while ((UEINTX & (1 << TXINI)) == 0) {}
+    UEDATX = keyboard_modifier;
+    for (int i = 0; i < 6; i++) {
+	UEDATX = keyboard_pressed_keys
+	    [i];  // According to the spec, this method of getting the
+	// report is not used for device polling, although we
+	// still have to implement the response
+    }
+    UEINTX &= ~(1 << TXINI);
+    return 0;
+}
+
+int handle_get_idle_request(USBRequest* request) {
+    while ((UEINTX & (1 << TXINI)) == 0) {}
+    UEDATX = keyboard_idle_value;
+    UEINTX &= ~(1 << TXINI);
+    return 0;
+}
+
+int handle_get_protocol_request(USBRequest* request) {
+    while ((UEINTX & (1 << TXINI)) == 0) {}
+    UEDATX = keyboard_protocol;
+    UEINTX &= ~(1 << TXINI);
+    return 0;
+}
+
+int handle_set_report_request(USBRequest* request) {
+    while (!(UEINTX & (1 << RXOUTI)))
+	;  // This is the opposite of the TXINI one, we are waiting until
+    // the banks are ready for reading instead of for writing
+    keyboard_leds = UEDATX;
+
+    UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
+    UEINTX &= ~(1 << RXOUTI);
+    return 0;
+}
+
+int handle_set_idle_request(USBRequest* request) {
+    keyboard_idle_value = request->value;  //
+    current_idle = 0;
+
+    UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
+    return 0;
+}
+
+int handle_set_protocol_request(USBRequest* request) {
+    keyboard_protocol =
+	request->value >> 8;  // Nobody cares what happens to this, arbitrary cast
+    // from 16 bit to 8 bit doesn't matter
+
+    UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
+    return 0;
+}
+
 int handle_usb_request() {
     USBRequest request;
     for (int i = 0; i < sizeof(USBRequest); i++) {
@@ -483,6 +538,7 @@ int handle_usb_request() {
         (1 << TXINI));  // Handshake the Interrupts, do this after recording
                         // the packet because it also clears the endpoint banks
 
+    // General USB requests.
     switch (request.request) {
     case GET_DESCRIPTOR:
 	return handle_usb_get_descriptor_request(&request);
@@ -496,76 +552,31 @@ int handle_usb_request() {
 	return handle_get_status_request(&request);
     }
 
-    if (request.index == 0) {  // Is this a request to the keyboard interface for HID
-                        // class-specific requests?
-	if (request.request_type ==
-	    0xA1) {  // GET Requests - Refer to the table in HID Specification 7.2
-	    // - This byte specifies the data direction of the packet.
-	    // Unnecessary since request.request is unique, but it makes the
-	    // code clearer
-	    if (request.request == GET_REPORT) {  // Get the current HID report
-		while (!(UEINTX & (1 << TXINI)))
-		    ;  // Wait for the banks to be ready for transmission
-		UEDATX = keyboard_modifier;
+    // All class-specific requests have index == the interface number.
+    // Our interface number happens to be 0 so...easy hack.
+    if (request.index != 0) {
+	return -1;
+    }
 
-		for (int i = 0; i < 6; i++) {
-		    UEDATX = keyboard_pressed_keys
-			[i];  // According to the spec, this method of getting the
-		    // report is not used for device polling, although we
-		    // still have to implement the response
-		}
-		UEINTX &= ~(1 << TXINI);
-		return 0;
-	    }
-	    if (request.request == GET_IDLE) {
-		while (!(UEINTX & (1 << TXINI)))
-		    ;
-
-		UEDATX = keyboard_idle_value;
-
-		UEINTX &= ~(1 << TXINI);
-		return 0;
-	    }
-	    if (request.request == GET_PROTOCOL) {
-		while (!(UEINTX & (1 << TXINI)))
-		    ;
-
-		UEDATX = keyboard_protocol;
-
-		UEINTX &= ~(1 << TXINI);
-		return 0;
-	    }
+    if (request.request_type == 0b10100001) {
+	switch (request.request) {
+	case GET_REPORT:
+	    return handle_get_report_request(&request);
+	case GET_IDLE:
+	    return handle_get_idle_request(&request);
+	case GET_PROTOCOL:
+	    return handle_get_protocol_request(&request);
 	}
+    }
 
-	if (request.request_type ==
-	    0x21) {  // SET Requests - Host-to-device data direction
-	    if (request.request == SET_REPORT) {
-		while (!(UEINTX & (1 << RXOUTI)))
-		    ;  // This is the opposite of the TXINI one, we are waiting until
-		// the banks are ready for reading instead of for writing
-		keyboard_leds = UEDATX;
-
-		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
-		UEINTX &= ~(1 << RXOUTI);
-		return 0;
-	    }
-	    if (request.request == SET_IDLE) {
-		keyboard_idle_value = request.value;  //
-		current_idle = 0;
-
-		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
-		return 0;
-	    }
-	    if (request.request ==
-		SET_PROTOCOL) {  // This request is only mandatory for boot devices,
-		// and this is a boot device
-		keyboard_protocol =
-		    request.value >> 8;  // Nobody cares what happens to this, arbitrary cast
-		// from 16 bit to 8 bit doesn't matter
-
-		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
-		return 0;
-	    }
+    if (request.request_type == 0b00100001) {
+	switch (request.request) {
+	case SET_REPORT:
+	    return handle_set_report_request(&request);
+	case SET_IDLE:
+	    return handle_set_idle_request(&request);
+	case SET_PROTOCOL:
+	    return handle_set_protocol_request(&request);
 	}
     }
     return -1;
