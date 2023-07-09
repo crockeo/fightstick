@@ -285,25 +285,35 @@ int pause_tx() {
     return 0;
 }
 
-int write_descriptors(uint16_t request_length, uint8_t const* descriptors[], uint8_t descriptors_length) {
-    // TODO: what happens when we run out of request_length?
+int write_descriptor_part(uint8_t remaining_packet_length, uint8_t const* descriptor, uint8_t descriptor_length) {
+    uint8_t packet_length = descriptor_length;
+    if (packet_length > remaining_packet_length) {
+	packet_length = remaining_packet_length;
+    }
+    for (int i = 0; i < packet_length; i++) {
+	UEDATX = pgm_read_byte(descriptor + i);
+    }
+    return packet_length;
+}
 
+int write_descriptors(uint16_t request_length, uint8_t const* descriptors[], uint8_t descriptors_length) {
+    if (request_length > 255) {
+	request_length = 255;
+    }
     uint8_t remaining_packet_length = 32;
     for (int i = 0; i < descriptors_length; i++) {
 	uint8_t const* descriptor = descriptors[i];
 	uint8_t descriptor_length = pgm_read_byte(descriptor);
+	if (descriptor_length > request_length) {
+	    descriptor_length = request_length;
+	}
+	request_length -= descriptor_length;
 
 	while (descriptor_length > 0) {
-	    uint8_t packet_length = descriptor_length;
-	    if (packet_length > remaining_packet_length) {
-		packet_length = remaining_packet_length;
-	    }
-	    descriptor_length -= packet_length;
-	    remaining_packet_length -= packet_length;
-
-	    for (int i = 0; i < packet_length; i++) {
-		UEDATX = pgm_read_byte(descriptor + i);
-	    }
+	    uint8_t written = write_descriptor_part(remaining_packet_length, descriptor, descriptor_length);
+	    descriptor += written;
+	    descriptor_length -= written;
+	    remaining_packet_length -= written;
 
 	    if (remaining_packet_length == 0) {
 		if (pause_tx() < 0) {
