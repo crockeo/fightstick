@@ -35,8 +35,8 @@ int main(int argc, char** argv) {
     }
 
     PORTD = 0; // push nothing out of port 0 to start with...
-    DDRD &= ~(1 << PD1); // set PD1 to be input
-    PORTD |= (1 << PD1) | (1 << PD0) | (1 << PD4); // set PD1 to be pull-up
+    DDRD &= ~(1 << PD1) & ~(1 << PD0) & ~(1 << PD4); // set the pins we'll read from to be input
+    PORTD |= (1 << PD1) | (1 << PD0) | (1 << PD4); // and then set them to be pull-up
     while (true) {
 	int left_pressed = (PIND & (1 << PD1)) == 0;
 	int down_pressed = (PIND & (1 << PD0)) == 0;
