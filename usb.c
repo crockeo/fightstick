@@ -1,14 +1,11 @@
-/*
-usb.c
-USB Controller initialization, device setup, and HID interrupt routines
-*/
 #include "usb.h"
 
 #define F_CPU 16000000
+
 #include <avr/interrupt.h>
+#include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
-#include "avr/io.h"
 
 #include "descriptor.h"
 
@@ -408,89 +405,95 @@ typedef struct {
     uint16_t length;
 } USBRequest;
 
-USBRequest read_request() {
+int handle_usb_get_descriptor_request(USBRequest* request) {
+    switch (request->value >> 8) {
+    case 0x1:
+	write_device_descriptor(request->length);
+	break;
+    case 0x2:
+	write_configuration_descriptor(request->length);
+	break;
+    case 0x21:
+	write_hid_report_descriptor(request->length);
+	break;
+    case 0x22:
+	write_hid_descriptor(request->length);
+	break;
+    default:
+	// Enable the endpoint and stall, the
+	// descriptor does not exist
+	PORTC = 0xFF;
+	UECONX |= (1 << STALLRQ) | (1 << EPEN);
+	return -1;
+    }
+    return 0;
+}
+
+int handle_set_configuration_request(USBRequest* request) {
+    if (request->request_type != 0) {
+	return 0;
+    }
+
+    usb_config_status = request->value;
+    UEINTX &= ~(1 << TXINI);
+    UENUM = KEYBOARD_ENDPOINT_NUM;
+    UECONX = 1;
+    UECFG0X = 0b11000001;  // EPTYPE Interrupt IN
+    UECFG1X = 0b00000110;  // Dual Bank Endpoint, 8 Bytes, allocate memory
+    UERST = 0x1E;          // Reset all of the endpoints
+    UERST = 0;
+    return 0;
+}
+
+int handle_set_address_request(USBRequest* request) {
+    UEINTX &= ~(1 << TXINI);
+    while ((UEINTX & (1 << TXINI)) == 0) { }
+    UDADDR = request->value | (1 << ADDEN);  // Set the device address
+    return 0;
+}
+
+int handle_get_configuration_request(USBRequest* request) {
+    if (request->request_type != 0x80) {
+	return 0;
+    }
+
+    while ((UEINTX & (1 << TXINI)) == 0) {}
+    UEDATX = usb_config_status;
+    UEINTX &= ~(1 << TXINI);
+    return 0;
+}
+
+int handle_get_status_request(USBRequest* request) {
+    while ((UEINTX & (1 << TXINI)) == 0) {}
+    UEDATX = 0;
+    UEDATX = 0;
+    UEINTX &= ~(1 << TXINI);
+    return 0;
+}
+
+int handle_usb_request() {
     USBRequest request;
     for (int i = 0; i < sizeof(USBRequest); i++) {
 	((uint8_t*)&request)[i] = UEDATX;
     }
-    return request;
-}
-
-ISR(USB_COM_vect) {
-  UENUM = 0;
-  if (UEINTX & (1 << RXSTPI)) {
-      USBRequest request = read_request();
 
     DDRC = 0xFF;
-
     UEINTX &= ~(
         (1 << RXSTPI) | (1 << RXOUTI) |
         (1 << TXINI));  // Handshake the Interrupts, do this after recording
                         // the packet because it also clears the endpoint banks
-    if (request.request == GET_DESCRIPTOR) {
-	switch (request.value) {
-	case 0x100:
-	    write_device_descriptor(request.length);
-	    break;
-	case 0x200:
-	    write_configuration_descriptor(request.length);
-	    break;
-	case 0x2100:
-	    write_hid_report_descriptor(request.length);
-	    break;
-	case 0x2200:
-	    write_hid_descriptor(request.length);
-	    break;
-	default:
-            // Enable the endpoint and stall, the
-	    // descriptor does not exist
-	    PORTC = 0xFF;
-	    UECONX |= (1 << STALLRQ) | (1 << EPEN);
-	}
-	return;
-    }
 
-    if (request.request == SET_CONFIGURATION &&
-        request.request_type ==
-	0) {  // Refer to USB Spec 9.4.7 - This is the configuration request
-                  // to place the device into address mode
-	usb_config_status = request.value;
-	UEINTX &= ~(1 << TXINI);
-	UENUM = KEYBOARD_ENDPOINT_NUM;
-	UECONX = 1;
-	UECFG0X = 0b11000001;  // EPTYPE Interrupt IN
-	UECFG1X = 0b00000110;  // Dual Bank Endpoint, 8 Bytes, allocate memory
-	UERST = 0x1E;          // Reset all of the endpoints
-	UERST = 0;
-	return;
-    }
-
-    if (request.request == SET_ADDRESS) {
-	UEINTX &= ~(1 << TXINI);
-	while (!(UEINTX & (1 << TXINI)))
-	    ;  // Wait until the banks are ready to be filled
-
-	UDADDR = request.value | (1 << ADDEN);  // Set the device address
-	return;
-    }
-
-    if (request.request == GET_CONFIGURATION &&
-        request.request_type == 0x80) {  // GET_CONFIGURATION is the host trying to get
-                                  // the current config status of the device
-	while (!(UEINTX & (1 << TXINI)))
-	    ;  // Wait until the banks are ready to be filled
-	UEDATX = usb_config_status;
-	UEINTX &= ~(1 << TXINI);
-	return;
-    }
-
-    if (request.request == GET_STATUS) {
-	while (!(UEINTX & (1 << TXINI)))
-	    ;
-	UEDATX = 0;
-	UEDATX = 0;
-	UEINTX &= ~(1 << TXINI);
-	return;
+    switch (request.request) {
+    case GET_DESCRIPTOR:
+	return handle_usb_get_descriptor_request(&request);
+    case SET_CONFIGURATION:
+	return handle_set_configuration_request(&request);
+    case SET_ADDRESS:
+	return handle_set_address_request(&request);
+    case GET_CONFIGURATION:
+	return handle_get_configuration_request(&request);
+    case GET_STATUS:
+	return handle_get_status_request(&request);
     }
 
     if (request.index == 0) {  // Is this a request to the keyboard interface for HID
@@ -512,7 +515,7 @@ ISR(USB_COM_vect) {
 		    // still have to implement the response
 		}
 		UEINTX &= ~(1 << TXINI);
-		return;
+		return 0;
 	    }
 	    if (request.request == GET_IDLE) {
 		while (!(UEINTX & (1 << TXINI)))
@@ -521,7 +524,7 @@ ISR(USB_COM_vect) {
 		UEDATX = keyboard_idle_value;
 
 		UEINTX &= ~(1 << TXINI);
-		return;
+		return 0;
 	    }
 	    if (request.request == GET_PROTOCOL) {
 		while (!(UEINTX & (1 << TXINI)))
@@ -530,7 +533,7 @@ ISR(USB_COM_vect) {
 		UEDATX = keyboard_protocol;
 
 		UEINTX &= ~(1 << TXINI);
-		return;
+		return 0;
 	    }
 	}
 
@@ -544,14 +547,14 @@ ISR(USB_COM_vect) {
 
 		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
 		UEINTX &= ~(1 << RXOUTI);
-		return;
+		return 0;
 	    }
 	    if (request.request == SET_IDLE) {
 		keyboard_idle_value = request.value;  //
 		current_idle = 0;
 
 		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
-		return;
+		return 0;
 	    }
 	    if (request.request ==
 		SET_PROTOCOL) {  // This request is only mandatory for boot devices,
@@ -561,10 +564,20 @@ ISR(USB_COM_vect) {
 		// from 16 bit to 8 bit doesn't matter
 
 		UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
-		return;
+		return 0;
 	    }
 	}
     }
+    return -1;
+}
+
+ISR(USB_COM_vect) {
+  UENUM = 0;
+  if (UEINTX & (1 << RXSTPI)) {
+      if (handle_usb_request() < 0) {
+	  // TODO: errors
+      }
+      return;
   }
   PORTC = 0xFF;
   UECONX |= (1 << STALLRQ) |
