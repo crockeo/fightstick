@@ -27,6 +27,8 @@ static uint8_t this_interrupt =
 
 */
 
+// TODO(crockeo): make this into a struct, instead of a series of bytes.
+// and that also means finding the spec which defines this thing...
 static const uint8_t keyboard_HID_descriptor[] PROGMEM = {
     0x05,
     0x01,  // Usage Page - Generic Desktop - HID Spec Appendix E E.6 - The
@@ -275,6 +277,8 @@ ISR(USB_GEN_vect) {
 
 int pause_tx() {
     UEINTX &= ~(1 << TXINI);
+    // TODO(crockeo): find all of the places where this happens
+    // and abstract them in some kind of in-lined like "wait for tx" function
     while ((UEINTX & (1 << TXINI)) == 0) {}
     if ((UEINTX & (1 << RXOUTI)) != 0) {
 	return -1;
