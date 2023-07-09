@@ -1,11 +1,15 @@
 C_SOURCES=$(shell find . -type f -name '*.c')
+ELF_FILE="target/atmega32u4/release/fightstick.elf"
 
 deploy: build-c
 	avrdude \
 		-p atmega32u4 \
 		-c avr109 \
 		-P /dev/tty.usbmodem11201 \
-		-U flash:w:target/atmega32u4/release/fightstick.elf
+		-U flash:w:$(ELF_FILE)
+
+simulate: build-c
+	simavr --mcu atmega32u4 $(ELF_FILE)
 
 .PHONY: build
 build:
@@ -14,7 +18,7 @@ build:
 .PHONY: build-c
 build-c:
 	mkdir -p target/
-	avr-gcc -Wall -Werror -O3 -mmcu=atmega32u4 -o target/atmega32u4/release/fightstick.elf $(C_SOURCES)
+	avr-gcc -Wall -Werror -O3 -mmcu=atmega32u4 -o $(ELF_FILE) $(C_SOURCES)
 
 .PHONY: test
 test:
