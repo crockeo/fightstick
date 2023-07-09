@@ -347,26 +347,17 @@ ISR(USB_COM_vect) {
                         // the packet because it also clears the endpoint banks
     if (bRequest == GET_DESCRIPTOR) {
       // The Host is requesting a descriptor to enumerate the device
-      uint8_t const* descriptor;
-      uint8_t descriptor_length;
-
       if (wValue == 0x0100) {  // Is the host requesting a device descriptor?
-        descriptor = (uint8_t const*)&KEYBOARD_DEVICE_DESCRIPTOR;
-        descriptor_length = sizeof(DeviceDescriptor);
+	write_descriptor(wLength, (uint8_t const*)&KEYBOARD_DEVICE_DESCRIPTOR, sizeof(DeviceDescriptor));
       } else if (wValue ==
                  0x0200) {  // Is it asking for a configuration descriptor?
-        descriptor = configuration_descriptor;
-        descriptor_length =
-            CONFIG_SIZE;  // Configuration descriptor is comprised of many
-                          // different descriptors; the length is more than
-                          // bLength
+	write_descriptor(wLength, configuration_descriptor, CONFIG_SIZE);
       } else if (wValue ==
                  0x2100) {  // Is it asking for a HID Report Descriptor?
-        descriptor = configuration_descriptor + HID_OFFSET;
-        descriptor_length = pgm_read_byte(descriptor);
+	uint8_t const* descriptor = configuration_descriptor + HID_OFFSET;
+	write_descriptor(wLength, descriptor, pgm_read_byte(descriptor));
       } else if (wValue == 0x2200) {
-        descriptor = keyboard_HID_descriptor;
-        descriptor_length = sizeof(keyboard_HID_descriptor);
+	write_descriptor(wLength, keyboard_HID_descriptor, sizeof(keyboard_HID_descriptor));
       } else {
         PORTC = 0xFF;
         UECONX |=
@@ -374,8 +365,6 @@ ISR(USB_COM_vect) {
                                            // descriptor does not exist
         return;
       }
-
-      write_descriptor(wLength, descriptor, descriptor_length);
       return;
     }
 
