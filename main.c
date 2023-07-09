@@ -7,6 +7,7 @@
 #include <util/delay.h>
 
 #include "descriptor.h"
+#include "usb.h"
 
 #define USB_REQUEST_GET_STATUS 0x0
 #define USB_REQUEST_CLEAR_FEATURE 0x1
@@ -82,42 +83,8 @@ static const EndpointDescriptor KEYBOARD_ENDPOINT_DESCRIPTOR = {
 // RX_LED = PB0 = D17 = SS
 // TX_LED = D30 = PD5
 
-void disable_interrupts() {
-  cli();
-}
-
-void enable_interrupts() {
-  sei();
-}
-
-int init_usb() {
-  PLLCSR |= (1 << PINDIV); // operate in 8MHz mode
-  PLLCSR |= (1 << PLLE); // enable PLL
-  while ((PLLCSR & (1 << PLOCK)) == 0) {} // wait for PLL to be ready
-
-  // Ensure the USB controller in a known state.
-  USBCON &= ~(1 << USBE);
-  USBCON |= (1 << USBE);
-
-  // Unfreeze the USB clock.
-  USBCON &= ~(1 << FRZCLK);
-
-  // Enable voltage regulator to monitor data lines.
-  UHWCON |= (1 << UVREGE);
-
-  // Ensure the USB device is not in low-speed mode,
-  // and then ensure the interrupt pin is attached.
-  UDCON &= ~(1<<LSM);
-  UDCON &= ~(1<<DETACH);
-
-  // Set up:
-  // - VBUS interrupt.
-  // - End of reset interrupt.
-  // - Start of frame interrupt.
-  USBCON |= (1 << VBUSTE);
-  UDIEN |= (1 << EORSTE) | (1 << SOFE);
-  return 0;
-}
+void disable_interrupts() { cli(); }
+void enable_interrupts() { sei(); }
 
 void turn_on_leds() {
   PORTD &= ~(1 << PD5);
@@ -131,7 +98,7 @@ void turn_off_leds() {
 
 int main() {
   disable_interrupts();
-  init_usb();
+  usb_init();
   enable_interrupts();
 
   PORTD = 0; // push nothing out of port 0 to start with...
@@ -148,21 +115,6 @@ int main() {
       turn_off_leds();
     }
   }
-}
-
-void usb_reset() {
-  UENUM = 0;
-  UECONX = (1 << EPEN);
-  UECFG0X = 0;
-  UECFG1X = 34;
-  if ((UESTA0X & (1 << CFGOK)) == 0) {
-    // TODO: report this somehow? make the chip blink?
-    return;
-  }
-}
-
-void usb_frame() {
-  // TODO: ...
 }
 
 typedef struct USBRequest {
@@ -217,44 +169,28 @@ void usb_request() {
   // https://www.beyondlogic.org/usbnutshell/usb6.shtml
   USBRequest usb_request;
   uint8_t* usb_request_ptr = (uint8_t*)&usb_request;
-  for (int i = 0; i < sizeof(USBRequest); i++) {
+  for (int i = sizeof(USBRequest) - 1; i >= 0; i--) {
     usb_request_ptr[i] = UEDATX;
   }
 
-  if (usb_request.request == USB_REQUEST_GET_DESCRIPTOR) {
-    if (handle_get_descriptor_request(usb_request) != 0) {
-      // TODO: error handling?
-    }
-  }
+  /* if (usb_request.request == USB_REQUEST_GET_DESCRIPTOR) { */
+  /*   if (handle_get_descriptor_request(usb_request) != 0) { */
+  /*     // TODO: error handling? */
+  /*   } */
+  /* } */
 
-  if (usb_request.request == USB_REQUEST_SET_CONFIGURATION && usb_request.request_type == 0) {
-    // TODO: put device into address mode
-  }
+  /* if (usb_request.request == USB_REQUEST_SET_CONFIGURATION && usb_request.request_type == 0) { */
+  /*   // TODO: put device into address mode */
+  /* } */
 
-  if (usb_request.request == USB_REQUEST_SET_ADDRESS) {
-  }
+  /* if (usb_request.request == USB_REQUEST_SET_ADDRESS) { */
+  /* } */
 
-  if (usb_request.request == USB_REQUEST_GET_CONFIGURATION) {
-  }
+  /* if (usb_request.request == USB_REQUEST_GET_CONFIGURATION) { */
+  /* } */
 
-  if (usb_request.request == USB_REQUEST_GET_STATUS) {
-  }
-}
-
-ISR(USB_GEN_vect) {
-  if ((UDINT & (1 << EORSTI)) != 0) {
-    UDINT &= ~(1 << EORSTI);
-    usb_reset();
-  }
-
-  if ((UDINT & (1 << SOFI)) != 0) {
-    UDINT &= ~(1 << SOFI);
-    usb_frame();
-  }
-
-  /* Endpoint_Configure(0, ENDPOINT_TYPE_CONTROL, ENDPOINT_CONTROL_SIZE, 0); */
-
-  /* UDINT = 0 */
+  /* if (usb_request.request == USB_REQUEST_GET_STATUS) { */
+  /* } */
 }
 
 ISR(USB_COM_vect) {
@@ -264,10 +200,31 @@ ISR(USB_COM_vect) {
   }
 }
 
+int usb_reset() {
+  UENUM = 0;
+  UECONX = (1 << EPEN);
+  UECFG0X = 0;
+  UECFG1X = 34;
+  if ((UESTA0X & (1 << CFGOK)) == 0) {
+    return -1;
+  }
+  return 0;
+}
 
+ISR(USB_GEN_vect) {
+  if ((USBINT & (1 << VBUSTI)) != 0) {
+    USBINT &= ~(1 << VBUSTI);
+    // TODO: what to do here?
+  }
 
-/* ISR(USB_GEN_vect) { */
-/* } */
+  if ((UDINT & (1 << EORSTI)) != 0) {
+    UDINT &= ~(1 << EORSTI);
+    usb_reset();
+  }
 
-/* ISR(USB_COM_vect) { */
-/* } */
+  // TODO: when i want to send frames
+  /* if ((UDINT & (1 << SOFI)) != 0) { */
+  /*   UDINT &= ~(1 << SOFI); */
+  /*   usb_frame(); */
+  /* } */
+}
