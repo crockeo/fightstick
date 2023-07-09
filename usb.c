@@ -2,13 +2,15 @@
 usb.c
 USB Controller initialization, device setup, and HID interrupt routines
 */
+#include "usb.h"
 
 #define F_CPU 16000000
-#include "usb.h"
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
 #include "avr/io.h"
+
+#include "descriptor.h"
 
 
 volatile uint8_t keyboard_pressed_keys[6] = {0, 0, 0, 0, 0, 0};
@@ -28,40 +30,21 @@ static uint8_t this_interrupt =
 
 */
 
-static const uint8_t device_descriptor[] PROGMEM = {
-    // Stored in PROGMEM (Program Memory) Flash, freeing up some SRAM where
-    // variables are usually stored
-    18,  // bLength - The total size of the descriptor
-    1,   // bDescriptorType - The type of descriptor - 1 is device
-    0x00,
-    0x02,  // bcdUSB - The USB protcol supported - Refer to USB 2.0
-           // Chapter 9.6.1
-    0,   // bDeviceClass - The Device Class, 0 indicating that the HID interface
-         // will specify it
-    0,   // bDeviceSubClass - 0, HID will specify
-    0,   // bDeviceProtocol - No class specific protocols on a device level, HID
-         // interface will specify
-    32,  // bMaxPacketSize0 - 32 byte packet size; control endpoint was
-         // configured in UECFG1X to be 32 bytes
-    (idVendor & 255),
-    ((idVendor >> 8) &
-     255),  // idVendor - Vendor ID specified by USB-IF (To fit the 2 bytes, the
-            // ID is split into least significant and most significant byte)
-    (idProduct & 255),
-    ((idProduct >> 8) & 255),  // idProduct - The Product ID specified by USB-IF
-                               // - Split in the same way as idVendor
-    0x00,
-    0x01,  // bcdDevice - Device Version Number
-    0,  // iManufacturer - The String Descriptor that has the manufacturer name
-        // -
-        // Specified by USB 2.0 Table 9-8
-    0,  // iProduct - The String Descriptor that has the product name -
-        // Specified
-        // by USB 2.0 Table 9-8
-    0,  // iSerialNumber - The String Descriptor that has the serial number of
-        // the product - Specified by USB 2.0 Table 9-8
-    1   // bNumConfigurations - The number of configurations of the device, most
-        // devices only have one
+static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
+  .length = sizeof(DeviceDescriptor),
+  .descriptor_type = 1,
+  .usb_version = 0x0200,
+  .device_class = 0,
+  .device_subclass = 0,
+  .device_protocol = 0,
+  .max_packet_size = 32,
+  .vendor_id = 0xfeed,
+  .product_id = 0x0001,
+  .device_version = 0x0100,
+  .manufacturer_string_index = 0,
+  .product_string_index = 0,
+  .serial_number_string_index = 0,
+  .num_configurations = 1,
 };
 
 /*  HID Descriptor - The descriptor that gives information about the HID device
@@ -329,8 +312,8 @@ ISR(USB_COM_vect) {
       uint8_t descriptor_length;
 
       if (wValue == 0x0100) {  // Is the host requesting a device descriptor?
-        descriptor = device_descriptor;
-        descriptor_length = pgm_read_byte(descriptor);
+        descriptor = (uint8_t const*)&KEYBOARD_DEVICE_DESCRIPTOR;
+        descriptor_length = sizeof(DeviceDescriptor);
       } else if (wValue ==
                  0x0200) {  // Is it asking for a configuration descriptor?
         descriptor = configuration_descriptor;
