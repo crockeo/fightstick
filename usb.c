@@ -30,43 +30,6 @@ static uint8_t this_interrupt =
 
 */
 
-static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
-    .length = sizeof(DeviceDescriptor),
-    .descriptor_type = 1,
-    .usb_version = 0x0200,
-    .device_class = 0,
-    .device_subclass = 0,
-    .device_protocol = 0,
-    .max_packet_size = 32,
-    .vendor_id = 0xfeed,
-    .product_id = 0x0001,
-    .device_version = 0x0100,
-    .manufacturer_string_index = 0,
-    .product_string_index = 0,
-    .serial_number_string_index = 0,
-    .num_configurations = 1,
-};
-
-/* static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR PROGMEM = { */
-/*     9,  // bLength */
-/*     2,  // bDescriptorType - 2 is device */
-/*     CONFIG_SIZE, */
-/*     1,      // bNumInterfaces - 1 Interface */
-/*     1,      // bConfigurationValue */
-/*     0,      // iConfiguration - We have no string descriptors */
-/*     0xC0,   // bmAttributes - Set the device power source */
-/*     50,     // bMaxPower - 50 x 2mA units = 100mA max power consumption */
-
-/* }; */
-
-/* // TODO: remove after this is used */
-/* ConfigurationDescriptor _ = KEYBOARD_CONFIG_DESCRIPTOR; */
-
-/*  HID Descriptor - The descriptor that gives information about the HID device
-        Specification: Device Class Definition for Human Interface Devices (HID)
-   6/27/2001 Appendix B - Keyboard Protocol Specification This descriptor was
-   written referring to the example descriptor in table E.6
-*/
 static const uint8_t keyboard_HID_descriptor[] PROGMEM = {
     0x05,
     0x01,  // Usage Page - Generic Desktop - HID Spec Appendix E E.6 - The
@@ -138,30 +101,36 @@ static const uint8_t keyboard_HID_descriptor[] PROGMEM = {
     0xC0   // End collection
 };
 
-/*  Configuration Descriptor - The descriptor that gives information about the
-   device conifguration(s) and how to select them Specification: USB 2.0 (April
-   27, 2000) Chapter 9 Table 9-10 Note: The reason the descriptors are
-   structured the way they are is to better show the tree structure of the
-   descriptors; if the HID inteface descriptor was separate from the
-   configuration descriptor, we wouldn't need the HID_OFFSET, but that would
-   imply that the descriptors are separate entities when they are really
-   dependent on each other
-*/
 
-static const uint8_t configuration_descriptor[] PROGMEM = {
-    9,  // bLength
-    2,  // bDescriptorType - 2 is device
-    (CONFIG_SIZE & 255),
-    ((CONFIG_SIZE >> 8) &
-     255),  // wTotalLength - The total length of the descriptor tree
-    1,      // bNumInterfaces - 1 Interface
-    1,      // bConfigurationValue
-    0,      // iConfiguration - We have no string descriptors
-    0xC0,   // bmAttributes - Set the device power source
-    50,     // bMaxPower - 50 x 2mA units = 100mA max power consumption
-    // Refer to Table 9-10 for the descriptor structure - Configuration
-    // Descriptors have interface descriptors, interface descriptors have
-    // endpoint descriptors along with a special HID descriptor
+static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
+    .length = sizeof(DeviceDescriptor),
+    .descriptor_type = 1,
+    .usb_version = 0x0200,
+    .device_class = 0,
+    .device_subclass = 0,
+    .device_protocol = 0,
+    .max_packet_size = 32,
+    .vendor_id = 0xfeed,
+    .product_id = 0x0001,
+    .device_version = 0x0100,
+    .manufacturer_string_index = 0,
+    .product_string_index = 0,
+    .serial_number_string_index = 0,
+    .num_configurations = 1,
+};
+
+static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR PROGMEM = {
+    .length = 9,
+    .descriptor_type = 2,
+    .total_length = CONFIG_SIZE,
+    .num_interfaces = 1,
+    .configuration_value = 1,
+    .configuration_string_index = 0,
+    .attributes = 0xC0,
+    .max_power = 50,
+};
+
+static const InterfaceDescriptor KEYBOARD_INTERFACE_DESCRIPTOR PROGMEM = {
     9,     // bLength
     4,     // bDescriptorType - 4 is interface
     0,     // bInterfaceNumber - This is the 0th and only interface
@@ -175,22 +144,26 @@ static const uint8_t configuration_descriptor[] PROGMEM = {
     0x01,  // bInterfaceProtocol - 0x01 (specified by USB-IF) is the protcol
            // code for keyboards
     0,     // iInterface - There are no string descriptors for this
-    // HID Descriptor - Refer to E.4 HID Spec
-    9,           // bLength
-    0x21,        // bDescriptorType - 0x21 is HID
-    0x11, 0x01,  // bcdHID - HID Class Specification 1.11
-    0,           // bCountryCode
-    1,           // bNumDescriptors - Number of HID descriptors
-    0x22,        // bDescriptorType - Type of descriptor
-    sizeof(keyboard_HID_descriptor), 0,  // wDescriptorLength
-    // Endpoint Descriptor - Example can be found in the HID spec table E.5
+};
+
+static const EndpointDescriptor KEYBOARD_ENDPOINT_DESCRIPTOR PROGMEM = {
     7,     // bLength
     0x05,  // bDescriptorType
     KEYBOARD_ENDPOINT_NUM |
         0x80,  // Set keyboard endpoint to IN endpoint, refer to table
     0x03,      // bmAttributes - Set endpoint to interrupt
-    8, 0,      // wMaxPacketSize - The size of the keyboard banks
+    8,      // wMaxPacketSize - The size of the keyboard banks
     0x01       // wInterval - Poll for new data 1000/s, or once every ms
+};
+
+static const HIDDescriptor KEYBOARD_HID_DESCRIPTOR PROGMEM = {
+    9,           // bLength
+    0x21,        // bDescriptorType - 0x21 is HID
+    0x0111,	  // bcdHID - HID Class Specification 1.11
+    0,           // bCountryCode
+    1,           // bNumDescriptors - Number of HID descriptors
+    0x22,        // bDescriptorType - Type of descriptor
+    sizeof(keyboard_HID_descriptor),  // wDescriptorLength
 };
 
 int usb_init() {
@@ -386,11 +359,11 @@ int write_device_descriptor(uint16_t request_length) {
 }
 
 int write_configuration_descriptor(uint16_t request_length) {
-    uint8_t const * descriptors[4] = {
-	configuration_descriptor,
-	configuration_descriptor + 9,
-	configuration_descriptor + 18,
-	configuration_descriptor + 27,
+    uint8_t const* descriptors[4] = {
+	(uint8_t const*)&KEYBOARD_CONFIG_DESCRIPTOR,
+	(uint8_t const*)&KEYBOARD_INTERFACE_DESCRIPTOR,
+	(uint8_t const*)&KEYBOARD_HID_DESCRIPTOR,
+	(uint8_t const*)&KEYBOARD_ENDPOINT_DESCRIPTOR,
     };
     return write_descriptors(
 	request_length,
@@ -400,11 +373,10 @@ int write_configuration_descriptor(uint16_t request_length) {
 }
 
 int write_hid_report_descriptor(uint16_t request_length) {
-    uint8_t const* descriptor = configuration_descriptor + HID_OFFSET;
     return write_descriptor(
 	request_length,
-	descriptor,
-	pgm_read_byte(descriptor)
+	(uint8_t const*)&KEYBOARD_HID_DESCRIPTOR,
+	sizeof(KEYBOARD_HID_DESCRIPTOR)
     );
 }
 
