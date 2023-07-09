@@ -288,6 +288,45 @@ ISR(USB_GEN_vect) {
   }
 }
 
+int write_descriptor(uint16_t wLength, uint8_t const* descriptor, uint8_t descriptor_length) {
+  uint8_t request_length =
+    wLength > 255 ? 255
+    : wLength;  // Our endpoint is only so big; the USB Spec
+  // says to truncate the response if the size
+  // exceeds the size of the endpoint
+
+  descriptor_length =
+    request_length > descriptor_length
+    ? descriptor_length
+    : request_length;  // Truncate to descriptor length at most
+
+  while (descriptor_length > 0) {
+    while (!(UEINTX & (1 << TXINI)))
+      ;  // Wait for banks to be ready for data transmission
+    if (UEINTX & (1 << RXOUTI))
+      return -1;  // If there is another packet, exit to handle it
+
+    uint8_t thisPacket =
+      descriptor_length > 32
+      ? 32
+      : descriptor_length;  // Make sure that the packet we are
+    // getting is not too big to fit in the
+    // endpoint
+
+    for (int i = 0; i < thisPacket; i++) {
+      UEDATX = pgm_read_byte(
+			     descriptor +
+			     i);  // Send the descriptor over UEDATX, use pgmspace functions
+      // because the descriptors are stored in flash
+    }
+
+    descriptor_length -= thisPacket;
+    descriptor += thisPacket;
+    UEINTX &= ~(1 << TXINI);
+  }
+  return 0;
+}
+
 ISR(USB_COM_vect) {
   UENUM = 0;
   if (UEINTX & (1 << RXSTPI)) {
@@ -336,41 +375,7 @@ ISR(USB_COM_vect) {
         return;
       }
 
-      uint8_t request_length =
-          wLength > 255 ? 255
-                        : wLength;  // Our endpoint is only so big; the USB Spec
-                                    // says to truncate the response if the size
-                                    // exceeds the size of the endpoint
-
-      descriptor_length =
-          request_length > descriptor_length
-              ? descriptor_length
-              : request_length;  // Truncate to descriptor length at most
-
-      while (descriptor_length > 0) {
-        while (!(UEINTX & (1 << TXINI)))
-          ;  // Wait for banks to be ready for data transmission
-        if (UEINTX & (1 << RXOUTI))
-          return;  // If there is another packet, exit to handle it
-
-        uint8_t thisPacket =
-            descriptor_length > 32
-                ? 32
-                : descriptor_length;  // Make sure that the packet we are
-                                      // getting is not too big to fit in the
-                                      // endpoint
-
-        for (int i = 0; i < thisPacket; i++) {
-          UEDATX = pgm_read_byte(
-              descriptor +
-              i);  // Send the descriptor over UEDATX, use pgmspace functions
-                   // because the descriptors are stored in flash
-        }
-
-        descriptor_length -= thisPacket;
-        descriptor += thisPacket;
-        UEINTX &= ~(1 << TXINI);
-      }
+      write_descriptor(wLength, descriptor, descriptor_length);
       return;
     }
 
