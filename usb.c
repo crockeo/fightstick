@@ -318,6 +318,7 @@ int write_descriptor(uint16_t wLength, uint8_t const* descriptor, uint8_t descri
 	UEINTX &= ~(1 << TXINI);
     }
     return 0;
+}
 
 
 ISR(USB_COM_vect) {
