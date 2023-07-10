@@ -18,4 +18,3 @@ uint8_t keyboard_protocol; // This doesn't matter at all, we just need it for su
 
 int usb_init();
 int usb_send();
-int send_keypress(uint8_t key);

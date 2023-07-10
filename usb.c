@@ -212,16 +212,6 @@ int usb_init() {
   return 0;
 }
 
-int send_keypress(uint8_t key) {
-  keyboard_pressed_keys[0] = key;
-  if (usb_send() < 0)
-    return -1;
-  keyboard_pressed_keys[0] = 0;
-  if (usb_send() < 0)
-    return -1;
-  return 0;
-}
-
 int usb_send() {
     if (usb_state != USB_STATE_ATTACHED) {
 	return -1;
