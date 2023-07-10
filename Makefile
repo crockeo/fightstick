@@ -17,14 +17,14 @@ build:
 	avr-gcc -Wall -Werror -O3 -mmcu=atmega32u4 -o $(ELF_FILE) $(C_SOURCES)
 
 .PHONY: rust-build
-build:
+rust-build:
 	cargo build -Zbuild-std=core --target=./atmega32u4.json --release
 
 .PHONY: rust-test
-test:
+rust-test:
 	cargo test --release
 
 
 .PHONY: rust-doc
-doc:
+rust-doc:
 	cargo doc --open --release
