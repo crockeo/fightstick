@@ -9,6 +9,7 @@
 
 #include "descriptor.h"
 
+volatile usb_state_t usb_state = USB_STATE_UNKNOWN;
 
 volatile uint8_t keyboard_pressed_keys[6] = {0, 0, 0, 0, 0, 0};
 volatile uint8_t keyboard_modifier = 0;
@@ -185,7 +186,7 @@ int usb_init() {
   UDIEN |= (1 << EORSTE) |
            (1 << SOFE);  // Re-enable the EORSTE (End Of Reset) Interrupt so we
                          // know when we can configure the control endpoint
-  usb_config_status = 0;
+  usb_state = USB_STATE_DISCONNECTED;
   sei();  // Global Interrupt Enable
   return 0;
 }
@@ -203,8 +204,10 @@ int send_keypress(uint8_t key, uint8_t mod) {
 }
 
 int usb_send() {
-  if (!usb_config_status)
-    return -1;  // Why are you even trying
+    if (usb_state != USB_STATE_ATTACHED) {
+	return -1;
+    }
+
   cli();
   UENUM = KEYBOARD_ENDPOINT_NUM;
 
@@ -222,10 +225,6 @@ int usb_send() {
   return 0;
 }
 
-bool get_usb_config_status() {
-  return usb_config_status;
-}
-
 ISR(USB_GEN_vect) {
   uint8_t udint_temp = UDINT;
   UDINT = 0;
@@ -236,7 +235,7 @@ ISR(USB_GEN_vect) {
     UECONX = (1 << EPEN);  // Enable the Endpoint
     UECFG0X = 0;      // Control Endpoint, OUT direction for control endpoint
     UECFG1X |= 0x22;  // 32 byte endpoint, 1 bank, allocate the memory
-    usb_config_status = 0;
+    usb_state = USB_STATE_DISCONNECTED;
 
     if (!(UESTA0X &
           (1 << CFGOK))) {  // Check if endpoint configuration was successful
@@ -250,8 +249,7 @@ ISR(USB_GEN_vect) {
         (1 << RXSTPE);  // Re-enable the RXSPTE (Receive Setup Packet) Interrupt
     return;
   }
-  if ((udint_temp & (1 << SOFI)) &&
-      usb_config_status) {  // Check for Start Of Frame Interrupt and correct
+  if ((udint_temp & (1 << SOFI)) && usb_state == USB_STATE_ATTACHED) {  // Check for Start Of Frame Interrupt and correct
                             // usb configuration, send keypress if a keypress
                             // event has not been sent through usb_send
     this_interrupt++;
@@ -438,7 +436,7 @@ int handle_set_configuration_request(USBRequest* request) {
 	return 0;
     }
 
-    usb_config_status = request->value;
+    usb_state = USB_STATE_ATTACHED;
     UEINTX &= ~(1 << TXINI);
     UENUM = KEYBOARD_ENDPOINT_NUM;
     UECONX = 1;
@@ -462,7 +460,7 @@ int handle_get_configuration_request(USBRequest* request) {
     }
 
     while ((UEINTX & (1 << TXINI)) == 0) {}
-    UEDATX = usb_config_status;
+    UEDATX = usb_state;
     UEINTX &= ~(1 << TXINI);
     return 0;
 }

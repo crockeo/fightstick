@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     // Set buttons to input.
     DDRD &= (~(1 << PD0) & ~(1 << PD1) & ~(1 << PD4));
 
-    while (!get_usb_config_status()) {
+    while (usb_state != USB_STATE_ATTACHED) {
 	turn_off_leds();
 	_delay_ms(100);
 	turn_on_leds();
