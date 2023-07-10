@@ -9,6 +9,28 @@
 
 #include "descriptor.h"
 
+// General USB request codes.
+#define GET_STATUS 0x00
+#define CLEAR_FEATURE 0x01
+#define SET_FEATURE 0x03
+#define SET_ADDRESS 0x05
+#define GET_DESCRIPTOR 0x06
+#define GET_CONFIGURATION 0x08
+#define SET_CONFIGURATION 0x09
+#define GET_INTERFACE 0x0A
+#define SET_INTERFACE 0x0B
+
+// HID class-specific request codes.
+#define GET_REPORT 0x01
+#define GET_IDLE 0x02
+#define GET_PROTOCOL 0x03
+#define SET_REPORT 0x09
+#define SET_IDLE 0x0A
+#define SET_PROTOCOL 0x0B
+
+#define KEYBOARD_ENDPOINT_NUM 3  // The second endpoint is the HID endpoint
+
+
 volatile usb_state_t usb_state = USB_STATE_UNKNOWN;
 
 volatile uint8_t keyboard_pressed_keys[6] = {0, 0, 0, 0, 0, 0};
@@ -21,11 +43,6 @@ static uint8_t current_idle =
 static uint8_t this_interrupt =
     0;  // This is not the best way to do it, but it
         // is much more readable than the alternative
-
-/*  Device Descriptor - The top level descriptor when enumerating a USB device`
-        Specification: USB 2.0 (April 27, 2000) Chapter 9 Table 9-5
-
-*/
 
 // TODO(crockeo): make this into a struct, instead of a series of bytes.
 // and that also means finding the spec which defines this thing...
@@ -121,7 +138,12 @@ static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
 static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR PROGMEM = {
     .length = 9,
     .descriptor_type = 2,
-    .total_length = CONFIG_SIZE,
+    .total_length = (
+	sizeof(ConfigurationDescriptor)
+	+ sizeof(InterfaceDescriptor)
+	+ sizeof(EndpointDescriptor)
+	+ sizeof(HIDDescriptor)
+    ),
     .num_interfaces = 1,
     .configuration_value = 1,
     .configuration_string_index = 0,
