@@ -44,11 +44,11 @@ int main(int argc, char** argv) {
 
 	if (left_pressed || down_pressed || right_pressed) {
 	    turn_on_leds();
-	    for (int i = 0; i < 6; i++) {
-		send_keypress(KEY_A, 0);
-	    }
+	    keyboard_pressed_keys[0] = KEY_A;
 	} else {
 	    turn_off_leds();
+	    keyboard_pressed_keys[0] = 0;
 	}
+	usb_send();
     }
 }
