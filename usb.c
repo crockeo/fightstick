@@ -44,6 +44,8 @@ static uint8_t this_interrupt =
     0;  // This is not the best way to do it, but it
         // is much more readable than the alternative
 
+uint8_t keyboard_protocol = 0;
+
 // TODO(crockeo): make this into a struct, instead of a series of bytes.
 // and that also means finding the spec which defines this thing...
 static const uint8_t keyboard_HID_descriptor[] PROGMEM = {
