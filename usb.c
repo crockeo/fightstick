@@ -502,8 +502,6 @@ int handle_set_report_request(USBRequest* request) {
     while (!(UEINTX & (1 << RXOUTI)))
 	;  // This is the opposite of the TXINI one, we are waiting until
     // the banks are ready for reading instead of for writing
-    keyboard_leds = UEDATX;
-
     UEINTX &= ~(1 << TXINI);  // Send ACK and clear TX bit
     UEINTX &= ~(1 << RXOUTI);
     return 0;

@@ -16,9 +16,6 @@ extern volatile uint8_t keyboard_pressed_keys[6];
 
 uint8_t keyboard_protocol; // This doesn't matter at all, we just need it for supporting a request
 
-uint8_t keyboard_leds;  // You don't need to use this if you don't want
-                               // to or don't have the hardware
-
 int usb_init();
 int usb_send();
 int send_keypress(uint8_t key);
