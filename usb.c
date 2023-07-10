@@ -12,7 +12,6 @@
 volatile usb_state_t usb_state = USB_STATE_UNKNOWN;
 
 volatile uint8_t keyboard_pressed_keys[6] = {0, 0, 0, 0, 0, 0};
-volatile uint8_t keyboard_modifier = 0;
 
 static uint16_t keyboard_idle_value =
     125;  // HID Idle setting, how often the device resends unchanging reports,
@@ -191,13 +190,11 @@ int usb_init() {
   return 0;
 }
 
-int send_keypress(uint8_t key, uint8_t mod) {
+int send_keypress(uint8_t key) {
   keyboard_pressed_keys[0] = key;
-  keyboard_modifier = mod;
   if (usb_send() < 0)
     return -1;
   keyboard_pressed_keys[0] = 0;
-  keyboard_modifier = 0;
   if (usb_send() < 0)
     return -1;
   return 0;
@@ -213,8 +210,8 @@ int usb_send() {
 
   while (!(UEINTX & (1 << RWAL)))
     ;  // Wait for banks to be ready
-  UEDATX = keyboard_modifier;
-  UEDATX = 0;
+  UEDATX = 0; // modifier
+  UEDATX = 0; // reserved byte
   for (int i = 0; i < 6; i++) {
     UEDATX = keyboard_pressed_keys[i];
   }
@@ -261,8 +258,8 @@ ISR(USB_GEN_vect) {
         if (current_idle ==
             keyboard_idle_value) {  // Have we reached the idle threshold?
           current_idle = 0;
-          UEDATX = keyboard_modifier;
-          UEDATX = 0;
+          UEDATX = 0; // modifier
+          UEDATX = 0; // reserved byte
           for (int i = 0; i < 6; i++) {
             UEDATX = keyboard_pressed_keys[i];
           }
@@ -475,7 +472,8 @@ int handle_get_status_request(USBRequest* request) {
 
 int handle_get_report_request(USBRequest* request) {
     while ((UEINTX & (1 << TXINI)) == 0) {}
-    UEDATX = keyboard_modifier;
+    UEDATX = 0; // modifier
+    UEDATX = 0; // reserved byte
     for (int i = 0; i < 6; i++) {
 	UEDATX = keyboard_pressed_keys
 	    [i];  // According to the spec, this method of getting the

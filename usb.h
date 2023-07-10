@@ -13,7 +13,6 @@ extern volatile usb_state_t usb_state;
 
 
 extern volatile uint8_t keyboard_pressed_keys[6];
-extern volatile uint8_t keyboard_modifier;
 
 uint8_t keyboard_protocol; // This doesn't matter at all, we just need it for supporting a request
 
@@ -22,7 +21,7 @@ uint8_t keyboard_leds;  // You don't need to use this if you don't want
 
 int usb_init();
 int usb_send();
-int send_keypress(uint8_t, uint8_t);
+int send_keypress(uint8_t key);
 
 #define GET_STATUS 0x00
 #define CLEAR_FEATURE 0x01
