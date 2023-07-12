@@ -1,6 +1,0 @@
-[toolchain]
-# TODO: make this target a more up-to-date toolchain
-# related: https://users.rust-lang.org/t/adding-host-unit-tests-to-an-embedded-project/93434/2
-# https://users.rust-lang.org/t/llvm-error-expected-a-constant-shift-amount/94013/2
-channel = "nightly-2022-07-17"
-components = ["rustfmt", "rustc", "rust-src"]
