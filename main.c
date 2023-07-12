@@ -69,6 +69,10 @@ int main(int argc, char** argv) {
 
 	int keyboard_index = 0;
 	for (int i = 0; i < BUTTON_COUNT; i++) {
+	    if (keyboard_index >= 6) {
+		break;
+	    }
+
 	    if (is_pin_low(buttons[i].pin)) {
 		leds_on = true;
 		keyboard_pressed_keys[keyboard_index] = buttons[i].scancode;
