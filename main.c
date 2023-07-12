@@ -9,10 +9,8 @@
 #include "keys.h"
 #include "usb.h"
 
-#define BUTTON_COUNT 6
+#define BUTTON_COUNT 10
 
-// TODO: make these buttons work with a full set of inputs.
-// - make it so we try to fill up keyboard_pressed_keys from the left instead of at each button index
 typedef struct {
     pin_t pin;
     uint8_t scancode;
@@ -25,7 +23,10 @@ static PinButton buttons[BUTTON_COUNT] = {
     {PIN_D6, KEY_W},
     {PIN_D7, KEY_J},
     {PIN_D8, KEY_K},
-    /* {PIN_D9, KEY_L}, */
+    {PIN_D9, KEY_L},
+    {PIN_D16, KEY_U},
+    {PIN_D14, KEY_I},
+    {PIN_D15, KEY_O},
 };
 
 void turn_on_leds() {
@@ -62,12 +63,16 @@ int main(int argc, char** argv) {
 
     while (true) {
 	bool leds_on = false;
+	for (int i = 0; i < 6; i++) {
+	    keyboard_pressed_keys[i] = 0;
+	}
+
+	int keyboard_index = 0;
 	for (int i = 0; i < BUTTON_COUNT; i++) {
 	    if (is_pin_low(buttons[i].pin)) {
 		leds_on = true;
-		keyboard_pressed_keys[i] = buttons[i].scancode;
-	    } else {
-		keyboard_pressed_keys[i] = 0;
+		keyboard_pressed_keys[keyboard_index] = buttons[i].scancode;
+		keyboard_index++;
 	    }
 	}
 

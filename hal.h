@@ -24,7 +24,8 @@
 // - e.g. 111 = 7
 typedef uint8_t pin_t;
 
-// Based on pin numbering from ProMicro schematic:
+// Based on pin numbering from ProMicro schematic.
+// Ordering = counter-clockwise.
 // https://cdn.sparkfun.com/assets/f/d/8/0/d/ProMicro16MHzv2.pdf
 const pin_t PIN_D1 = 0b010011; // PD3
 const pin_t PIN_D0 = 0b010010; // PD2
@@ -35,7 +36,15 @@ const pin_t PIN_D5 = 0b001110; // PC6
 const pin_t PIN_D6 = 0b010111; // PD7
 const pin_t PIN_D7 = 0b011110; // PE6
 const pin_t PIN_D8 = 0b000100; // PB4
-const pin_t PIN_D9 = 0b000101; // PB4
+const pin_t PIN_D9 = 0b000101; // PB5
+const pin_t PIN_D10 = 0b000110; // PB6
+const pin_t PIN_D16 = 0b000010; // PB2
+const pin_t PIN_D14 = 0b000011; // PB3
+const pin_t PIN_D15 = 0b000001; // PB1
+const pin_t PIN_A0 = 0b100111; // PF7
+const pin_t PIN_A1 = 0b100011; // PF6
+const pin_t PIN_A2 = 0b100101; // PF5
+const pin_t PIN_A3 = 0b100100; // PF4
 
 // TODO: how to make these functions not cost so many cycles?
 void set_pull_up(pin_t pin) {
