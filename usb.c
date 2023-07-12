@@ -9,6 +9,11 @@
 
 #include "descriptor.h"
 
+#define DESCRIPTOR_REQUEST_DEVICE 0x01
+#define DESCRIPTOR_REQUEST_CONFIGURATION 0x02
+#define DESCRIPTOR_REQUEST_HID 0x21
+#define DESCRIPTOR_REQUEST_REPORT 0x22
+
 // General USB request codes.
 #define GET_STATUS 0x00
 #define CLEAR_FEATURE 0x01
@@ -48,7 +53,7 @@ uint8_t keyboard_protocol = 0;
 
 // TODO(crockeo): make this into a struct, instead of a series of bytes.
 // and that also means finding the spec which defines this thing...
-static const uint8_t keyboard_HID_descriptor[] PROGMEM = {
+static const uint8_t keyboard_report_descriptor[] PROGMEM = {
     0x05,
     0x01,  // Usage Page - Generic Desktop - HID Spec Appendix E E.6 - The
            // values for the HID tags are not clearly listed anywhere really, so
@@ -181,7 +186,7 @@ static const HIDDescriptor KEYBOARD_HID_DESCRIPTOR PROGMEM = {
     .country_code = 0,
     .num_child_descriptors = 1,
     .child_descriptor_type = 0x22,
-    .child_descriptor_length = sizeof(keyboard_HID_descriptor),
+    .child_descriptor_length = sizeof(keyboard_report_descriptor),
 };
 
 int usb_init() {
@@ -395,13 +400,13 @@ int write_hid_report_descriptor(uint16_t request_length) {
     );
 }
 
-int write_hid_descriptor(uint16_t request_length) {
+int write_report_descriptor(uint16_t request_length) {
     // TODO: this isn't actually a normal descriptor
     // and so it can't use the pgm_read_byte(...) of the first element
     return write_descriptor(
 	request_length,
-	keyboard_HID_descriptor,
-	sizeof(keyboard_HID_descriptor)
+	keyboard_report_descriptor,
+	sizeof(keyboard_report_descriptor)
     );
 }
 
@@ -415,17 +420,17 @@ typedef struct {
 
 int handle_usb_get_descriptor_request(USBRequest* request) {
     switch (request->value >> 8) {
-    case 0x1:
+    case DESCRIPTOR_REQUEST_DEVICE:
 	write_device_descriptor(request->length);
 	break;
-    case 0x2:
+    case DESCRIPTOR_REQUEST_CONFIGURATION:
 	write_configuration_descriptor(request->length);
 	break;
-    case 0x21:
+    case DESCRIPTOR_REQUEST_HID:
 	write_hid_report_descriptor(request->length);
 	break;
-    case 0x22:
-	write_hid_descriptor(request->length);
+    case DESCRIPTOR_REQUEST_REPORT:
+	write_report_descriptor(request->length);
 	break;
     default:
 	// Enable the endpoint and stall, the
