@@ -154,39 +154,34 @@ static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR PROGMEM = {
 };
 
 static const InterfaceDescriptor KEYBOARD_INTERFACE_DESCRIPTOR PROGMEM = {
-    9,     // bLength
-    4,     // bDescriptorType - 4 is interface
-    0,     // bInterfaceNumber - This is the 0th and only interface
-    0,     // bAlternateSetting - There are no alternate settings
-    1,     // bNumEndpoints - This interface only uses one endpoint
-    0x03,  // bInterfaceClass - 0x03 (specified by USB-IF) is the interface
-           // class code for HID
-    0x01,  // bInterfaceSubClass - 1 (specified by USB-IF) is the constant for
-           // the boot subclass - this keyboard can communicate with the BIOS,
-           // but is limited to 6KRO, as are most keyboards
-    0x01,  // bInterfaceProtocol - 0x01 (specified by USB-IF) is the protcol
-           // code for keyboards
-    0,     // iInterface - There are no string descriptors for this
+    .length = 9,
+    .descriptor_type = 4,
+    .interface_number = 0,
+    .alternate_setting = 0,
+    .num_endpoints = 1,
+    .interface_class = 0x03, // interface class for HIDdescriptor
+    .interface_subclass = 0x01,  // boot subclass, because this is a keyboard :^)
+    .interface_protocol = 0x01,  // protocol for keyboard
+    .interface_string_index = 0,
 };
 
 static const EndpointDescriptor KEYBOARD_ENDPOINT_DESCRIPTOR PROGMEM = {
-    7,     // bLength
-    0x05,  // bDescriptorType
-    KEYBOARD_ENDPOINT_NUM |
-        0x80,  // Set keyboard endpoint to IN endpoint, refer to table
-    0x03,      // bmAttributes - Set endpoint to interrupt
-    8,      // wMaxPacketSize - The size of the keyboard banks
-    0x01       // wInterval - Poll for new data 1000/s, or once every ms
+    .length = 7,
+    .descriptor_type = 0x05,
+    .endpoint_address = KEYBOARD_ENDPOINT_NUM | 0x80,
+    .attributes = 0x03,
+    .max_packet_size = 8,
+    .interval = 0x01
 };
 
 static const HIDDescriptor KEYBOARD_HID_DESCRIPTOR PROGMEM = {
-    9,           // bLength
-    0x21,        // bDescriptorType - 0x21 is HID
-    0x0111,	  // bcdHID - HID Class Specification 1.11
-    0,           // bCountryCode
-    1,           // bNumDescriptors - Number of HID descriptors
-    0x22,        // bDescriptorType - Type of descriptor
-    sizeof(keyboard_HID_descriptor),  // wDescriptorLength
+    .length = 9,
+    .descriptor_type = 0x21,
+    .hid_version = 0x0111,
+    .country_code = 0,
+    .num_child_descriptors = 1,
+    .child_descriptor_type = 0x22,
+    .child_descriptor_length = sizeof(keyboard_HID_descriptor),
 };
 
 int usb_init() {
