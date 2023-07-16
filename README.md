@@ -1,6 +1,6 @@
 # fightstick
 
-Custom fightstick firmware written in [Rust](https://www.rust-lang.org/)
+Custom fightstick firmware written in C
 for the [SparkFun Pro Micro](https://www.sparkfun.com/products/12640).
 
 ## License

@@ -9,6 +9,11 @@
 
 #include "descriptor.h"
 
+#define DESCRIPTOR_REQUEST_DEVICE 0x01
+#define DESCRIPTOR_REQUEST_CONFIGURATION 0x02
+#define DESCRIPTOR_REQUEST_HID 0x21
+#define DESCRIPTOR_REQUEST_REPORT 0x22
+
 // General USB request codes.
 #define GET_STATUS 0x00
 #define CLEAR_FEATURE 0x01
@@ -30,6 +35,7 @@
 
 #define KEYBOARD_ENDPOINT_NUM 3  // The second endpoint is the HID endpoint
 
+volatile usb_config_t const* usb_config;
 
 volatile usb_state_t usb_state = USB_STATE_UNKNOWN;
 
@@ -46,150 +52,8 @@ static uint8_t this_interrupt =
 
 uint8_t keyboard_protocol = 0;
 
-// TODO(crockeo): make this into a struct, instead of a series of bytes.
-// and that also means finding the spec which defines this thing...
-static const uint8_t keyboard_HID_descriptor[] PROGMEM = {
-    0x05,
-    0x01,  // Usage Page - Generic Desktop - HID Spec Appendix E E.6 - The
-           // values for the HID tags are not clearly listed anywhere really, so
-           // this table is very useful
-    0x09,
-    0x06,  // Usage - Keyboard
-    0xA1,
-    0x01,  // Collection - Application
-    0x05,
-    0x07,  // Usage Page - Key Codes
-    0x19,
-    0xE0,  // Usage Minimum - The bit that controls the 8 modifier characters
-           // (ctrl, command, etc)
-    0x29,
-    0xE7,  // Usage Maximum - The end of the modifier bit (0xE7 - 0xE0 = 1 byte)
-    0x15,
-    0x00,  // Logical Minimum - These keys are either not pressed or pressed, 0
-           // or 1
-    0x25,
-    0x01,  // Logical Maximum - Pressed state == 1
-    0x75,
-    0x01,  // Report Size - The size of the IN report to the host
-    0x95,
-    0x08,  // Report Count - The number of keys in the report
-    0x81,
-    0x02,  // Input - These are variable inputs
-    0x95,
-    0x01,  // Report Count - 1
-    0x75,
-    0x08,  // Report Size - 8
-    0x81,
-    0x01,  // This byte is reserved according to the spec
-    0x95,
-    0x05,  // Report Count - This is for the keyboard LEDs
-    0x75,
-    0x01,  // Report Size
-    0x05,
-    0x08,  // Usage Page for LEDs
-    0x19,
-    0x01,  // Usage minimum for LEDs
-    0x29,
-    0x05,  // Usage maximum for LEDs
-    0x91,
-    0x02,  // Output - This is for a host output to the keyboard for the status
-           // of the LEDs
-    0x95,
-    0x01,  // Padding for the report so that it is at least 1 byte
-    0x75,
-    0x03,  // Padding
-    0x91,
-    0x01,  // Output - Constant for padding
-    0x95,
-    0x06,  // Report Count - For the keys
-    0x75,
-    0x08,  // Report Size - For the keys
-    0x15,
-    0x00,  // Logical Minimum
-    0x25,
-    0x65,  // Logical Maximum
-    0x05,
-    0x07,  // Usage Page - Key Codes
-    0x19,
-    0x00,  // Usage Minimum - 0
-    0x29,
-    0x65,  // Usage Maximum - 101
-    0x81,
-    0x00,  // Input - Data, Array
-    0xC0   // End collection
-};
-
-
-static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
-    .length = sizeof(DeviceDescriptor),
-    .descriptor_type = 1,
-    .usb_version = 0x0200,
-    .device_class = 0,
-    .device_subclass = 0,
-    .device_protocol = 0,
-    .max_packet_size = 32,
-    .vendor_id = 0xfeed,
-    .product_id = 0x0001,
-    .device_version = 0x0100,
-    .manufacturer_string_index = 0,
-    .product_string_index = 0,
-    .serial_number_string_index = 0,
-    .num_configurations = 1,
-};
-
-static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR PROGMEM = {
-    .length = 9,
-    .descriptor_type = 2,
-    .total_length = (
-	sizeof(ConfigurationDescriptor)
-	+ sizeof(InterfaceDescriptor)
-	+ sizeof(EndpointDescriptor)
-	+ sizeof(HIDDescriptor)
-    ),
-    .num_interfaces = 1,
-    .configuration_value = 1,
-    .configuration_string_index = 0,
-    .attributes = 0xC0,
-    .max_power = 50,
-};
-
-static const InterfaceDescriptor KEYBOARD_INTERFACE_DESCRIPTOR PROGMEM = {
-    9,     // bLength
-    4,     // bDescriptorType - 4 is interface
-    0,     // bInterfaceNumber - This is the 0th and only interface
-    0,     // bAlternateSetting - There are no alternate settings
-    1,     // bNumEndpoints - This interface only uses one endpoint
-    0x03,  // bInterfaceClass - 0x03 (specified by USB-IF) is the interface
-           // class code for HID
-    0x01,  // bInterfaceSubClass - 1 (specified by USB-IF) is the constant for
-           // the boot subclass - this keyboard can communicate with the BIOS,
-           // but is limited to 6KRO, as are most keyboards
-    0x01,  // bInterfaceProtocol - 0x01 (specified by USB-IF) is the protcol
-           // code for keyboards
-    0,     // iInterface - There are no string descriptors for this
-};
-
-static const EndpointDescriptor KEYBOARD_ENDPOINT_DESCRIPTOR PROGMEM = {
-    7,     // bLength
-    0x05,  // bDescriptorType
-    KEYBOARD_ENDPOINT_NUM |
-        0x80,  // Set keyboard endpoint to IN endpoint, refer to table
-    0x03,      // bmAttributes - Set endpoint to interrupt
-    8,      // wMaxPacketSize - The size of the keyboard banks
-    0x01       // wInterval - Poll for new data 1000/s, or once every ms
-};
-
-static const HIDDescriptor KEYBOARD_HID_DESCRIPTOR PROGMEM = {
-    9,           // bLength
-    0x21,        // bDescriptorType - 0x21 is HID
-    0x0111,	  // bcdHID - HID Class Specification 1.11
-    0,           // bCountryCode
-    1,           // bNumDescriptors - Number of HID descriptors
-    0x22,        // bDescriptorType - Type of descriptor
-    sizeof(keyboard_HID_descriptor),  // wDescriptorLength
-};
-
-int usb_init() {
+int usb_init(const usb_config_t* _usb_config) {
+    usb_config = _usb_config;
   cli();  // Global Interrupt Disable
 
   UHWCON |= (1 << UVREGE);  // Enable USB Pads Regulator
@@ -373,17 +237,18 @@ int write_descriptor(uint16_t request_length, uint8_t const* descriptor, uint8_t
 int write_device_descriptor(uint16_t request_length) {
     return write_descriptor(
 	request_length,
-	(uint8_t const*)&KEYBOARD_DEVICE_DESCRIPTOR,
+	(uint8_t const*)usb_config->device_descriptor,
 	sizeof(DeviceDescriptor)
     );
 }
 
 int write_configuration_descriptor(uint16_t request_length) {
+    // TODO: make this write out _all_ of the descriptors...
     uint8_t const* descriptors[4] = {
-	(uint8_t const*)&KEYBOARD_CONFIG_DESCRIPTOR,
-	(uint8_t const*)&KEYBOARD_INTERFACE_DESCRIPTOR,
-	(uint8_t const*)&KEYBOARD_HID_DESCRIPTOR,
-	(uint8_t const*)&KEYBOARD_ENDPOINT_DESCRIPTOR,
+	(const uint8_t *)usb_config->configuration_descriptors[0],
+	(uint8_t const*)usb_config->interface_descriptors[0],
+	(uint8_t const*)usb_config->hid_descriptors[0],
+	(uint8_t const*)usb_config->endpoint_descriptors[0],
     };
     return write_descriptors(
 	request_length,
@@ -395,18 +260,18 @@ int write_configuration_descriptor(uint16_t request_length) {
 int write_hid_report_descriptor(uint16_t request_length) {
     return write_descriptor(
 	request_length,
-	(uint8_t const*)&KEYBOARD_HID_DESCRIPTOR,
-	sizeof(KEYBOARD_HID_DESCRIPTOR)
+	(uint8_t const*)usb_config->hid_descriptors[0],
+	sizeof(HIDDescriptor)
     );
 }
 
-int write_hid_descriptor(uint16_t request_length) {
+int write_report_descriptor(uint16_t request_length) {
     // TODO: this isn't actually a normal descriptor
     // and so it can't use the pgm_read_byte(...) of the first element
     return write_descriptor(
 	request_length,
-	keyboard_HID_descriptor,
-	sizeof(keyboard_HID_descriptor)
+	usb_config->report_descriptor,
+	usb_config->report_descriptor_length
     );
 }
 
@@ -420,17 +285,17 @@ typedef struct {
 
 int handle_usb_get_descriptor_request(USBRequest* request) {
     switch (request->value >> 8) {
-    case 0x1:
+    case DESCRIPTOR_REQUEST_DEVICE:
 	write_device_descriptor(request->length);
 	break;
-    case 0x2:
+    case DESCRIPTOR_REQUEST_CONFIGURATION:
 	write_configuration_descriptor(request->length);
 	break;
-    case 0x21:
+    case DESCRIPTOR_REQUEST_HID:
 	write_hid_report_descriptor(request->length);
 	break;
-    case 0x22:
-	write_hid_descriptor(request->length);
+    case DESCRIPTOR_REQUEST_REPORT:
+	write_report_descriptor(request->length);
 	break;
     default:
 	// Enable the endpoint and stall, the

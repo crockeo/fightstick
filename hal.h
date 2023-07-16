@@ -3,8 +3,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-// TODO: add in cases for PORTF / DDRF / PINF
-
 // Pin format, bits:
 //   abcd_efgh
 //
@@ -24,18 +22,27 @@
 // - e.g. 111 = 7
 typedef uint8_t pin_t;
 
-// Based on pin numbering from ProMicro schematic:
+// Based on pin numbering from ProMicro schematic.
+// Ordering = counter-clockwise.
 // https://cdn.sparkfun.com/assets/f/d/8/0/d/ProMicro16MHzv2.pdf
-const pin_t PIN_D1 = 0b010011; // PD3
-const pin_t PIN_D0 = 0b010010; // PD2
-const pin_t PIN_D2 = 0b010001; // PD1
-const pin_t PIN_D3 = 0b010000; // PD0
-const pin_t PIN_D4 = 0b010100; // PD4
-const pin_t PIN_D5 = 0b001110; // PC6
-const pin_t PIN_D6 = 0b010111; // PD7
-const pin_t PIN_D7 = 0b011110; // PE6
-const pin_t PIN_D8 = 0b000100; // PB4
-const pin_t PIN_D9 = 0b000101; // PB4
+#define PIN_D1 0b010011
+#define PIN_D0 0b010010
+#define PIN_D2 0b010001
+#define PIN_D3 0b010000
+#define PIN_D4 0b010100
+#define PIN_D5 0b001110
+#define PIN_D6 0b010111
+#define PIN_D7 0b011110
+#define PIN_D8 0b000100
+#define PIN_D9 0b000101
+#define PIN_D10 0b000110
+#define PIN_D16 0b000010
+#define PIN_D14 0b000011
+#define PIN_D15 0b000001
+#define PIN_A0 0b100111
+#define PIN_A1 0b100011
+#define PIN_A2 0b100101
+#define PIN_A3 0b100100
 
 // TODO: how to make these functions not cost so many cycles?
 void set_pull_up(pin_t pin) {
