@@ -39,6 +39,8 @@ volatile usb_config_t const* usb_config;
 
 volatile usb_state_t usb_state = USB_STATE_UNKNOWN;
 
+usb_state_t usb_get_state() { return usb_state; }
+
 volatile uint8_t keyboard_pressed_keys[6] = {0, 0, 0, 0, 0, 0};
 
 static uint16_t keyboard_idle_value =

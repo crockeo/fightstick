@@ -28,4 +28,5 @@ typedef enum {
 extern volatile usb_state_t usb_state;
 extern volatile uint8_t keyboard_pressed_keys[6];
 
+usb_state_t usb_get_state();
 int usb_send();
