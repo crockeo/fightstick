@@ -1,7 +1,7 @@
 C_SOURCES=$(shell find . -type f -name '*.c')
 ELF_FILE="target/atmega32u4/release/fightstick.elf"
 
-deploy: build
+deploy: rust-build
 	avrdude \
 		-p atmega32u4 \
 		-c avr109 \
