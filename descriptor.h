@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 typedef struct DeviceDescriptor {
     uint8_t length;
     uint8_t descriptor_type;
