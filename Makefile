@@ -24,9 +24,11 @@ firmware: $(LIBUSB)
 test: $(OBJ_FILES)
 	cargo test --release
 
+.PHONY: $(LIBUSB)
 $(LIBUSB): $(OBJ_FILES)
 	avr-ar rcs $@ $^
 
+.PHONY: $(OBJ_DIR)/%.o
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)
 	avr-gcc -Wall -Werror -O3 -mmcu=atmega32u4 -o $@ -c $<
