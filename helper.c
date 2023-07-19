@@ -1,4 +1,5 @@
 #include <avr/io.h>
+#include <string.h>
 
 #include "descriptor.h"
 #include "usb.h"
@@ -140,7 +141,6 @@ static const HIDDescriptor* KEYBOARD_HID_DESCRIPTORS[] = {
 };
 
 static usb_config_t USB_CONFIG = {
-    .device_descriptor = 0,
     .configuration_descriptors = KEYBOARD_CONFIG_DESCRIPTORS,
     .interface_descriptors = KEYBOARD_INTERFACE_DESCRIPTORS,
     .endpoint_descriptors = KEYBOARD_ENDPOINT_DESCRIPTORS,
@@ -151,6 +151,6 @@ static usb_config_t USB_CONFIG = {
 };
 
 void helper_usb_init(const DeviceDescriptor* device_descriptor) {
-    USB_CONFIG.device_descriptor = device_descriptor;
+    memcpy((uint8_t*)&USB_CONFIG.device_descriptor, device_descriptor, sizeof(DeviceDescriptor));
     usb_init(&USB_CONFIG);
 }

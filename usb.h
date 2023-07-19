@@ -6,7 +6,7 @@
 #include "descriptor.h"
 
 typedef struct {
-    const DeviceDescriptor* device_descriptor;
+    DeviceDescriptor device_descriptor;
     const ConfigurationDescriptor** configuration_descriptors;
     const InterfaceDescriptor** interface_descriptors;
     const EndpointDescriptor** endpoint_descriptors;
