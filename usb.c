@@ -4,7 +4,6 @@
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
-#include <avr/pgmspace.h>
 #include <util/delay.h>
 
 #include "descriptor.h"
@@ -165,7 +164,7 @@ int write_descriptor_part(uint8_t remaining_packet_length, uint8_t const* descri
 	packet_length = remaining_packet_length;
     }
     for (int i = 0; i < packet_length; i++) {
-	UEDATX = pgm_read_byte(descriptor + i);
+	UEDATX = descriptor[i];
     }
     return packet_length;
 }
@@ -177,7 +176,7 @@ int write_descriptors(uint16_t request_length, uint8_t const* descriptors[], uin
     uint8_t remaining_packet_length = 32;
     for (int i = 0; i < descriptors_length; i++) {
 	uint8_t const* descriptor = descriptors[i];
-	uint8_t descriptor_length = pgm_read_byte(descriptor);
+	uint8_t descriptor_length = descriptor[0];
 	if (descriptor_length > request_length) {
 	    descriptor_length = request_length;
 	}
@@ -223,7 +222,7 @@ int write_descriptor(uint16_t request_length, uint8_t const* descriptor, uint8_t
 	}
 
 	for (int i = 0; i < packet_size; i++) {
-	    UEDATX = pgm_read_byte(descriptor + i);
+	    UEDATX = descriptor[i];
 	}
 
 	descriptor_remaining -= packet_size;
@@ -266,8 +265,8 @@ int write_hid_report_descriptor(uint16_t request_length) {
 }
 
 int write_report_descriptor(uint16_t request_length) {
-    // TODO: this isn't actually a normal descriptor
-    // and so it can't use the pgm_read_byte(...) of the first element
+    // TODO: this isn't actually a normal descriptor,
+    // so the first byte isn't actually its length...
     return write_descriptor(
 	request_length,
 	usb_config->report_descriptor,

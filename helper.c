@@ -1,12 +1,11 @@
 #include <avr/io.h>
-#include <avr/pgmspace.h>
 
 #include "descriptor.h"
 #include "usb.h"
 
 // TODO(crockeo): make this into a struct, instead of a series of bytes.
 // and that also means finding the spec which defines this thing...
-static const uint8_t keyboard_report_descriptor[] PROGMEM = {
+static const uint8_t keyboard_report_descriptor[] = {
     0x05,
     0x01,  // Usage Page - Generic Desktop - HID Spec Appendix E E.6 - The
            // values for the HID tags are not clearly listed anywhere really, so
@@ -77,7 +76,7 @@ static const uint8_t keyboard_report_descriptor[] PROGMEM = {
     0xC0   // End collection
 };
 
-static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
+static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR = {
     .length = sizeof(DeviceDescriptor),
     .descriptor_type = 1,
     .usb_version = 0x0200,
@@ -94,7 +93,7 @@ static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR PROGMEM = {
     .num_configurations = 1,
 };
 
-static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR PROGMEM = {
+static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR = {
     .length = sizeof(ConfigurationDescriptor),
     .descriptor_type = 2,
     .total_length = (
@@ -114,7 +113,7 @@ static const ConfigurationDescriptor* KEYBOARD_CONFIG_DESCRIPTORS[] = {
     &KEYBOARD_CONFIG_DESCRIPTOR,
 };
 
-static const InterfaceDescriptor KEYBOARD_INTERFACE_DESCRIPTOR PROGMEM = {
+static const InterfaceDescriptor KEYBOARD_INTERFACE_DESCRIPTOR = {
     .length = sizeof(InterfaceDescriptor),
     .descriptor_type = 4,
     .interface_number = 0,
@@ -130,7 +129,7 @@ static const InterfaceDescriptor* KEYBOARD_INTERFACE_DESCRIPTORS[] = {
     &KEYBOARD_INTERFACE_DESCRIPTOR,
 };
 
-static const EndpointDescriptor KEYBOARD_ENDPOINT_DESCRIPTOR PROGMEM = {
+static const EndpointDescriptor KEYBOARD_ENDPOINT_DESCRIPTOR = {
     .length = sizeof(EndpointDescriptor),
     .descriptor_type = 0x05,
     .endpoint_address = 0x03 | 0x80,
@@ -143,7 +142,7 @@ static const EndpointDescriptor* KEYBOARD_ENDPOINT_DESCRIPTORS[] = {
     &KEYBOARD_ENDPOINT_DESCRIPTOR,
 };
 
-static const HIDDescriptor KEYBOARD_HID_DESCRIPTOR PROGMEM = {
+static const HIDDescriptor KEYBOARD_HID_DESCRIPTOR = {
     .length = sizeof(HIDDescriptor),
     .descriptor_type = 0x21,
     .hid_version = 0x0111,
