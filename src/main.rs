@@ -13,7 +13,11 @@ fn main() -> ! {
     let mut rx_led = pins.led_rx.into_output();
     let mut tx_led = pins.led_tx.into_output();
 
-    unsafe { helper_usb_init(&usb::DEVICE_DESCRIPTOR); }
+    unsafe {
+	let contents = usb::DEVICE_DESCRIPTOR.serialize();
+	core::mem::forget(contents);
+	helper_usb_init(contents.as_ptr());
+    }
     while !is_initialized() {
 	rx_led.toggle();
 	tx_led.toggle();
@@ -69,7 +73,7 @@ enum UsbState {
 
 #[link(name = "usb")]
 extern "C" {
-    fn helper_usb_init(device_descriptor: *const usb::DeviceDescriptor);
+    fn helper_usb_init(device_descriptor: *const u8);
     fn usb_send();
     static usb_state: UsbState;
     static mut keyboard_pressed_keys: [u8; 6];

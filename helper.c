@@ -150,7 +150,7 @@ static usb_config_t USB_CONFIG = {
     .report_descriptor_length = sizeof(keyboard_report_descriptor),
 };
 
-void helper_usb_init(const DeviceDescriptor* device_descriptor) {
-    memcpy((uint8_t*)&USB_CONFIG.device_descriptor, device_descriptor, sizeof(DeviceDescriptor));
+void helper_usb_init(const uint8_t* device_descriptor) {
+    USB_CONFIG.device_descriptor = device_descriptor;
     usb_init(&USB_CONFIG);
 }

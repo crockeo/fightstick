@@ -236,8 +236,8 @@ int write_descriptor(uint16_t request_length, uint8_t const* descriptor, uint8_t
 int write_device_descriptor(uint16_t request_length) {
     return write_descriptor(
 	request_length,
-	(uint8_t const*)&usb_config->device_descriptor,
-	sizeof(DeviceDescriptor)
+	usb_config->device_descriptor,
+	usb_config->device_descriptor[0]
     );
 }
 
