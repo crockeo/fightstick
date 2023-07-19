@@ -1,10 +1,11 @@
 #![feature(asm_experimental_arch)]
 #![feature(lang_items)]
-#![no_main]
-#![no_std]
+#![cfg_attr(not(test), no_main)]
+#![cfg_attr(not(test), no_std)]
 
 mod usb;
 
+#[cfg(not(test))]
 #[arduino_hal::entry]
 fn main() -> ! {
     let peripherals = arduino_hal::Peripherals::take().unwrap();
@@ -47,6 +48,7 @@ fn main() -> ! {
     }
 }
 
+#[cfg(not(test))]
 fn is_initialized() -> bool {
     unsafe { usb_state == UsbState::Attached }
 }
@@ -71,6 +73,7 @@ enum UsbState {
     Attached,
 }
 
+#[cfg(not(test))]
 #[link(name = "usb")]
 extern "C" {
     fn helper_usb_init(device_descriptor: *const u8);
@@ -79,6 +82,11 @@ extern "C" {
     static mut keyboard_pressed_keys: [u8; 6];
 }
 
+#[cfg(not(test))]
+#[link(name = "c")]
+extern "C" {}
+
+#[cfg(not(test))]
 #[panic_handler]
 fn panic_handler(_: &core::panic::PanicInfo) -> ! {
     loop {}
@@ -87,6 +95,7 @@ fn panic_handler(_: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 pub unsafe extern "C" fn abort() -> ! { loop {} }
 
+#[cfg(not(test))]
 #[lang = "eh_personality"]
 #[no_mangle]
 pub unsafe extern "C" fn eh_personality() {}
