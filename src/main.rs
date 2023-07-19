@@ -3,58 +3,41 @@
 #![no_main]
 #![no_std]
 
-static mut PINB: *mut u8 = 0x23 as *mut u8;
-static mut DDRB: *mut u8 = 0x24 as *mut u8;
-static mut PORTB: *mut u8 = 0x25 as *mut u8;
-
-static mut PIND: *mut u8 = 0x29 as *mut u8;
-static mut DDRD: *mut u8 = 0x2A as *mut u8;
-static mut PORTD: *mut u8 = 0x2B as *mut u8;
-
-#[no_mangle]
+#[arduino_hal::entry]
 fn main() -> ! {
-    unsafe {
-	// set LEDs to out
-        *DDRB |= 1 << 0;
-        *DDRD |= 1 << 5;
+    let peripherals = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(peripherals);
 
-	// set buttons to in
-	*DDRD &= !(1 << 1 | 1 << 0 | 1 << 4);
+    let mut rx_led = pins.led_rx.into_output();
+    let mut tx_led = pins.led_tx.into_output();
 
-	// set buttons to high, so they can be pulled low
-	*PORTD |= 1 << 1 | 1 << 0 | 1 << 4;
-    }
-
-    unsafe {
-        helper_usb_init();
-    }
+    unsafe { helper_usb_init(); }
     while !is_initialized() {
-        unsafe {
-            *PORTB ^= 1 << 0;
-            *PORTD ^= 1 << 5;
-        }
-        delay_ms(100);
+	rx_led.toggle();
+	tx_led.toggle();
+	arduino_hal::delay_ms(100);
     }
+    rx_led.set_high();
+    tx_led.set_high();
 
-    unsafe {
-	*PORTB |= 1 << 0;
-	*PORTD |= 1 << 5;
-    }
-
-    let ports: &[(u8, u8)] = &[(1, 0x04), (0, 0x05), (4, 0x06)];
+    let pins = [
+	(pins.d2.into_pull_up_input().downgrade(), 0x04),
+	(pins.d3.into_pull_up_input().downgrade(), 0x05),
+	(pins.d4.into_pull_up_input().downgrade(), 0x06),
+    ];
     loop {
-	for (i, (offset, scancode)) in ports.iter().enumerate() {
+	for (i, (pin, scancode)) in pins.iter().enumerate() {
+	    let value;
+	    if pin.is_low() {
+		value = *scancode;
+	    } else {
+		value = 0;
+	    }
 	    unsafe {
-		if *PIND & (1 << offset) == 0 {
-		    keyboard_pressed_keys[i] = *scancode;
-		} else {
-		    keyboard_pressed_keys[i] = 0;
-		}
+		keyboard_pressed_keys[i] = value;
 	    }
 	}
-        unsafe {
-            usb_send();
-        }
+	unsafe { usb_send(); }
     }
 }
 
@@ -94,6 +77,9 @@ extern "C" {
 fn panic_handler(_: &core::panic::PanicInfo) -> ! {
     loop {}
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn abort() -> ! { loop {} }
 
 #[lang = "eh_personality"]
 #[no_mangle]
