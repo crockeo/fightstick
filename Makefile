@@ -1,7 +1,6 @@
-FIRMWARE="target/fightstick.elf"
-SIMULATOR="target/simulator"
+FIRMWARE="target/atmega32u4/release/fightstick.elf"
 
-C_SOURCES=$(shell find . -type f -name '*.c' | grep -v simulator.c)
+C_SOURCES=$(shell find . -type f -name '*.c')
 
 .PHONY: deploy
 deploy: firmware
@@ -11,16 +10,14 @@ deploy: firmware
 		-P /dev/tty.usbmodem11201 \
 		-U flash:w:$(FIRMWARE)
 
-.PHONY: simulate
-simulate: simulator firmware
-	$(SIMULATOR) --freq 16000000 --tracer --mcu atmega32u4 $(FIRMWARE)
-
-.PHONY: simulator
-simulator:
-	mkdir -p $(shell dirname $(SIMULATOR))
-	gcc -I/opt/homebrew/include -I/opt/homebrew/include/simavr -I/opt/homebrew/include/simavr/parts -L/opt/homebrew/lib -lsimavr -lelf -Wall -Werror -O3 -o $(SIMULATOR) simulator.c
-
 .PHONY: firmware
 firmware:
-	mkdir -p $(shell dirname $(FIRMWARE))
-	avr-gcc -Wall -Werror -O3 -mmcu=atmega32u4 -o $(FIRMWARE) $(C_SOURCES)
+	cargo build -Zbuild-std=core --target=./atmega32u4.json --release
+
+.PHONY: test
+test:
+	cargo test --release
+
+.PHONY: doc
+doc:
+	cargo doc --open --release
