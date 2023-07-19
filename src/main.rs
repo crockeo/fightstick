@@ -15,9 +15,13 @@ fn main() -> ! {
     let mut tx_led = pins.led_tx.into_output();
 
     unsafe {
-	let contents = usb::DEVICE_DESCRIPTOR.serialize();
-	core::mem::forget(contents);
-	helper_usb_init(contents.as_ptr());
+	let device_descriptor = usb::DEVICE_DESCRIPTOR.serialize();
+	core::mem::forget(device_descriptor);
+
+	let config_descriptor = usb::CONFIG_DESCRIPTOR.serialize();
+	core::mem::forget(config_descriptor);
+
+	helper_usb_init(device_descriptor.as_ptr(), config_descriptor.as_ptr());
     }
     while !is_initialized() {
 	rx_led.toggle();
@@ -76,7 +80,7 @@ enum UsbState {
 #[cfg(not(test))]
 #[link(name = "usb")]
 extern "C" {
-    fn helper_usb_init(device_descriptor: *const u8);
+    fn helper_usb_init(device_descriptor: *const u8, config_descriptor: *const u8);
     fn usb_send();
     static usb_state: UsbState;
     static mut keyboard_pressed_keys: [u8; 6];

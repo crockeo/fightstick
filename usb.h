@@ -7,7 +7,7 @@
 
 typedef struct {
     const uint8_t* device_descriptor;
-    const ConfigurationDescriptor** configuration_descriptors;
+    const uint8_t* configuration_descriptor;
     const InterfaceDescriptor** interface_descriptors;
     const EndpointDescriptor** endpoint_descriptors;
     const HIDDescriptor** hid_descriptors;

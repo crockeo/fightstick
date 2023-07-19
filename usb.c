@@ -244,7 +244,7 @@ int write_device_descriptor(uint16_t request_length) {
 int write_configuration_descriptor(uint16_t request_length) {
     // TODO: make this write out _all_ of the descriptors...
     uint8_t const* descriptors[4] = {
-	(const uint8_t *)usb_config->configuration_descriptors[0],
+	usb_config->configuration_descriptor,
 	(uint8_t const*)usb_config->interface_descriptors[0],
 	(uint8_t const*)usb_config->hid_descriptors[0],
 	(uint8_t const*)usb_config->endpoint_descriptors[0],
