@@ -3,6 +3,8 @@
 #![no_main]
 #![no_std]
 
+mod usb;
+
 #[arduino_hal::entry]
 fn main() -> ! {
     let peripherals = arduino_hal::Peripherals::take().unwrap();
@@ -11,7 +13,7 @@ fn main() -> ! {
     let mut rx_led = pins.led_rx.into_output();
     let mut tx_led = pins.led_tx.into_output();
 
-    unsafe { helper_usb_init(); }
+    unsafe { helper_usb_init(&usb::DEVICE_DESCRIPTOR); }
     while !is_initialized() {
 	rx_led.toggle();
 	tx_led.toggle();
@@ -67,7 +69,7 @@ enum UsbState {
 
 #[link(name = "usb")]
 extern "C" {
-    fn helper_usb_init();
+    fn helper_usb_init(device_descriptor: *const usb::DeviceDescriptor);
     fn usb_send();
     static usb_state: UsbState;
     static mut keyboard_pressed_keys: [u8; 6];

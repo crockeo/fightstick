@@ -76,23 +76,6 @@ static const uint8_t keyboard_report_descriptor[] = {
     0xC0   // End collection
 };
 
-static const DeviceDescriptor KEYBOARD_DEVICE_DESCRIPTOR = {
-    .length = sizeof(DeviceDescriptor),
-    .descriptor_type = 1,
-    .usb_version = 0x0200,
-    .device_class = 0,
-    .device_subclass = 0,
-    .device_protocol = 0,
-    .max_packet_size = 32,
-    .vendor_id = 0xfeed,
-    .product_id = 0x0001,
-    .device_version = 0x0100,
-    .manufacturer_string_index = 0,
-    .product_string_index = 0,
-    .serial_number_string_index = 0,
-    .num_configurations = 1,
-};
-
 static const ConfigurationDescriptor KEYBOARD_CONFIG_DESCRIPTOR = {
     .length = sizeof(ConfigurationDescriptor),
     .descriptor_type = 2,
@@ -156,8 +139,8 @@ static const HIDDescriptor* KEYBOARD_HID_DESCRIPTORS[] = {
     &KEYBOARD_HID_DESCRIPTOR,
 };
 
-static const usb_config_t USB_CONFIG = {
-    .device_descriptor = &KEYBOARD_DEVICE_DESCRIPTOR,
+static usb_config_t USB_CONFIG = {
+    .device_descriptor = 0,
     .configuration_descriptors = KEYBOARD_CONFIG_DESCRIPTORS,
     .interface_descriptors = KEYBOARD_INTERFACE_DESCRIPTORS,
     .endpoint_descriptors = KEYBOARD_ENDPOINT_DESCRIPTORS,
@@ -167,6 +150,7 @@ static const usb_config_t USB_CONFIG = {
     .report_descriptor_length = sizeof(keyboard_report_descriptor),
 };
 
-void helper_usb_init() {
+void helper_usb_init(const DeviceDescriptor* device_descriptor) {
+    USB_CONFIG.device_descriptor = device_descriptor;
     usb_init(&USB_CONFIG);
 }
